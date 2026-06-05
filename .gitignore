@@ -5,3 +5,4 @@ dist/
 *.local
 decorator-test
 tsconfig.tsbuildinfo
+*.exe
