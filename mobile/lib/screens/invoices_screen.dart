@@ -25,6 +25,7 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
 
   Future<void> _load() async {
     final invoices = await AppDatabase.instance.getInvoices();
+    if (!mounted) return;
     setState(() {
       _all = invoices;
       _filter();
@@ -134,7 +135,7 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
   }
 }
 
-// ─── Invoice tile ─────────────────────────────────────────────────────────────
+// ─── Invoice tile ──────────────────────────────────────────────────────────────────────────
 
 const _statusColors = {
   InvoiceStatus.draft: Colors.grey,

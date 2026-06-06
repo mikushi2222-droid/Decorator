@@ -56,7 +56,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   }
 }
 
-// ─── Store settings tab ───────────────────────────────────────────────────────
+// ─── Store settings tab ─────────────────────────────────────────────────────────────────────
 
 class _StoreSettingsTab extends StatefulWidget {
   const _StoreSettingsTab();
@@ -95,6 +95,7 @@ class _StoreSettingsTabState extends State<_StoreSettingsTab> {
 
   Future<void> _load() async {
     final s = await AppDatabase.instance.getSettings();
+    if (!mounted) return;
     setState(() {
       _settings = s;
       _controllers['name']!.text            = s.name;
@@ -131,6 +132,7 @@ class _StoreSettingsTabState extends State<_StoreSettingsTab> {
       adText:          _controllers['adText']!.text,
     );
     await AppDatabase.instance.saveSettings(updated);
+    if (!mounted) return;
     setState(() { _settings = updated; _saved = true; });
     await Future.delayed(const Duration(seconds: 2));
     if (mounted) setState(() => _saved = false);
@@ -184,7 +186,7 @@ class _StoreSettingsTabState extends State<_StoreSettingsTab> {
   }
 }
 
-// ─── Products tab ─────────────────────────────────────────────────────────────
+// ─── Products tab ─────────────────────────────────────────────────────────────────────────────
 
 class _ProductsTab extends StatefulWidget {
   const _ProductsTab();
@@ -210,6 +212,7 @@ class _ProductsTabState extends State<_ProductsTab> {
 
   Future<void> _loadCategories() async {
     final cats = await AppDatabase.instance.getCategories();
+    if (!mounted) return;
     setState(() => _categories = ['Все', ...cats]);
   }
 
@@ -218,6 +221,7 @@ class _ProductsTabState extends State<_ProductsTab> {
     final cat = _activeCategory == 'Все' ? null : _activeCategory;
     final res = await AppDatabase.instance.searchProducts(_searchC.text, category: cat);
     final all = await AppDatabase.instance.getProducts();
+    if (!mounted) return;
     setState(() { _products = res; _total = all.length; _loading = false; });
   }
 
@@ -386,7 +390,7 @@ class _ProductsTabState extends State<_ProductsTab> {
   }
 }
 
-// ─── Labor tab ────────────────────────────────────────────────────────────────
+// ─── Labor tab ───────────────────────────────────────────────────────────────────────────────
 
 class _LaborTab extends StatefulWidget {
   const _LaborTab();
@@ -406,6 +410,7 @@ class _LaborTabState extends State<_LaborTab> {
 
   Future<void> _load() async {
     final rates = await AppDatabase.instance.getLaborRates();
+    if (!mounted) return;
     setState(() => _rates = rates);
   }
 

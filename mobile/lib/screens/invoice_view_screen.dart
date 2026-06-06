@@ -23,8 +23,9 @@ class _InvoiceViewScreenState extends State<InvoiceViewScreen> {
   }
 
   Future<void> _changeStatus(InvoiceStatus status) async {
+    if (_invoice.id == null) return;
     await AppDatabase.instance.updateInvoiceStatus(_invoice.id!, status);
-    setState(() => _invoice = _invoice.copyWith(status: status));
+    if (mounted) setState(() => _invoice = _invoice.copyWith(status: status));
   }
 
   Future<void> _delete() async {
