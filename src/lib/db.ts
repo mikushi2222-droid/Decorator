@@ -57,11 +57,20 @@ async function seedIfEmpty() {
     const settingsCount = await db.settings.count()
     if (settingsCount === 0) {
       await db.settings.add({
-        name: 'Магазин Декоратор',
-        address: 'г. Москва, ул. Примерная, 1',
-        phone: '+7 (999) 000-00-00',
-        inn: '',
+        name: 'ООО "АКЦЕНТ"',
+        address: '',
+        phone: '',
+        inn: '7814860953',
+        kpp: '781401001',
+        ogrn: '1267800014206',
         logo: '',
+        bankName: 'СЕВЕРО-ЗАПАДНЫЙ БАНК ПАО СБЕРБАНК',
+        bankBik: '044030653',
+        bankAccount: '40702810555710020199',
+        bankCorrAccount: '30101810500000000653',
+        bankInn: '7707083893',
+        bankKpp: '784243001',
+        adText: 'Барельефы · Скалы · Травертин · Шёлк и другие декоративки · Обучение и мастер-классы',
       })
     }
   })

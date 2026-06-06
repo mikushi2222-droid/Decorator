@@ -5,8 +5,9 @@ import { formatCurrency } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Dialog } from '@/components/ui/dialog'
-import { Settings as SettingsIcon, Plus, Trash2, Package, Hammer, Store, Check, Info, AlertTriangle } from 'lucide-react'
+import { Settings as SettingsIcon, Plus, Trash2, Package, Hammer, Store, Check, Info, AlertTriangle, Landmark } from 'lucide-react'
 import type { Product, LaborRate } from '@/types'
 
 function StoreSettingsSection() {
@@ -17,6 +18,15 @@ function StoreSettingsSection() {
   const [address, setAddress] = useState('')
   const [phone, setPhone] = useState('')
   const [inn, setInn] = useState('')
+  const [kpp, setKpp] = useState('')
+  const [ogrn, setOgrn] = useState('')
+  const [bankName, setBankName] = useState('')
+  const [bankBik, setBankBik] = useState('')
+  const [bankAccount, setBankAccount] = useState('')
+  const [bankCorrAccount, setBankCorrAccount] = useState('')
+  const [bankInn, setBankInn] = useState('')
+  const [bankKpp, setBankKpp] = useState('')
+  const [adText, setAdText] = useState('')
 
   useEffect(() => {
     if (settings) {
@@ -24,40 +34,93 @@ function StoreSettingsSection() {
       setAddress(settings.address || '')
       setPhone(settings.phone || '')
       setInn(settings.inn || '')
+      setKpp(settings.kpp || '')
+      setOgrn(settings.ogrn || '')
+      setBankName(settings.bankName || '')
+      setBankBik(settings.bankBik || '')
+      setBankAccount(settings.bankAccount || '')
+      setBankCorrAccount(settings.bankCorrAccount || '')
+      setBankInn(settings.bankInn || '')
+      setBankKpp(settings.bankKpp || '')
+      setAdText(settings.adText || '')
     }
   }, [settings])
 
   const save = async () => {
+    const data = { name, address, phone, inn, kpp, ogrn, logo: settings?.logo || '', bankName, bankBik, bankAccount, bankCorrAccount, bankInn, bankKpp, adText }
     if (settings?.id) {
-      await db.settings.update(settings.id, { name, address, phone, inn })
+      await db.settings.update(settings.id, data)
     } else {
-      await db.settings.add({ name, address, phone, inn, logo: '' })
+      await db.settings.add(data)
     }
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base flex items-center gap-2">
-          <Store className="h-4 w-4" /> Реквизиты магазина
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="flex items-start gap-2 rounded-md bg-muted/60 px-3 py-2.5 text-xs text-muted-foreground">
-          <Info className="h-3.5 w-3.5 shrink-0 mt-0.5 text-primary" />
-          <span>Эти данные автоматически печатаются на накладных. Заполните хотя бы название и телефон.</span>
-        </div>
-        <Input label="Название магазина" value={name} onChange={(e) => setName(e.target.value)} placeholder="ИП Иванов / Декоратор" />
-        <Input label="Адрес" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="г. Москва, ул. Примерная, 1" />
-        <Input label="Телефон" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+7 (999) 000-00-00" />
-        <Input label="ИНН (необязательно)" value={inn} onChange={(e) => setInn(e.target.value)} placeholder="7701234567" />
-        <Button className="w-full" onClick={save} variant={saved ? 'secondary' : 'default'}>
-          {saved ? <><Check className="h-4 w-4" /> Сохранено</> : 'Сохранить'}
-        </Button>
-      </CardContent>
-    </Card>
+    <div className="space-y-3">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Store className="h-4 w-4" /> Реквизиты организации
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-start gap-2 rounded-md bg-muted/60 px-3 py-2.5 text-xs text-muted-foreground">
+            <Info className="h-3.5 w-3.5 shrink-0 mt-0.5 text-primary" />
+            <span>Эти данные печатаются на каждой накладной. Заполните один раз — потом они подставляются автоматически.</span>
+          </div>
+          <Input label="Наименование организации" value={name} onChange={(e) => setName(e.target.value)} placeholder='ООО "АКЦЕНТ"' />
+          <Input label="Адрес" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="г. Санкт-Петербург, ул. Примерная, 1" />
+          <Input label="Телефон" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+7 (812) 000-00-00" />
+          <div className="grid grid-cols-2 gap-2">
+            <Input label="ИНН" value={inn} onChange={(e) => setInn(e.target.value)} placeholder="7814860953" />
+            <Input label="КПП" value={kpp} onChange={(e) => setKpp(e.target.value)} placeholder="781401001" />
+          </div>
+          <Input label="ОГРН" value={ogrn} onChange={(e) => setOgrn(e.target.value)} placeholder="1267800014206" />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Landmark className="h-4 w-4" /> Банковские реквизиты
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs text-muted-foreground">Отображаются внизу каждой накладной — для оплаты по безналу.</p>
+          <Input label="Наименование банка" value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="СЕВЕРО-ЗАПАДНЫЙ БАНК ПАО СБЕРБАНК" />
+          <div className="grid grid-cols-2 gap-2">
+            <Input label="БИК" value={bankBik} onChange={(e) => setBankBik(e.target.value)} placeholder="044030653" />
+            <Input label="ИНН банка" value={bankInn} onChange={(e) => setBankInn(e.target.value)} placeholder="7707083893" />
+          </div>
+          <Input label="Расчётный счёт" value={bankAccount} onChange={(e) => setBankAccount(e.target.value)} placeholder="40702810555710020199" />
+          <div className="grid grid-cols-2 gap-2">
+            <Input label="Корр. счёт" value={bankCorrAccount} onChange={(e) => setBankCorrAccount(e.target.value)} placeholder="30101810500000000653" />
+            <Input label="КПП банка" value={bankKpp} onChange={(e) => setBankKpp(e.target.value)} placeholder="784243001" />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Реклама на накладных</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs text-muted-foreground">Короткий текст — печатается внизу каждой накладной как мини-реклама.</p>
+          <Textarea
+            value={adText}
+            onChange={(e) => setAdText(e.target.value)}
+            placeholder="Барельефы · Скалы · Травертин · Шёлк · Обучение и мастер-классы"
+            rows={2}
+          />
+        </CardContent>
+      </Card>
+
+      <Button className="w-full" onClick={save} variant={saved ? 'secondary' : 'default'}>
+        {saved ? <><Check className="h-4 w-4" /> Сохранено</> : 'Сохранить реквизиты'}
+      </Button>
+    </div>
   )
 }
 
