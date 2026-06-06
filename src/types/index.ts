@@ -55,7 +55,16 @@ export interface StoreSettings {
   address: string
   phone: string
   inn: string
+  kpp?: string
+  ogrn?: string
   logo: string
+  bankName?: string
+  bankBik?: string
+  bankAccount?: string
+  bankCorrAccount?: string
+  bankInn?: string
+  bankKpp?: string
+  adText?: string
 }
 
 export interface PlasterType {

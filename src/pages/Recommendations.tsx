@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { PLASTERS, SURFACES, ROOMS, STYLES } from '@/lib/plasters'
-import { formatCurrency, formatNumber } from '@/lib/utils'
+import { formatCurrency } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Sparkles, Clock, Star, ChevronDown, ChevronUp, RotateCcw } from 'lucide-react'
+import { Sparkles, Clock, Star, ChevronDown, ChevronUp, RotateCcw, AlertCircle } from 'lucide-react'
 import type { PlasterType } from '@/types'
 
 type Step = 'surface' | 'room' | 'style' | 'results'
@@ -13,7 +13,7 @@ function FilterChip({ label, active, onClick }: { label: string; active: boolean
   return (
     <button
       onClick={onClick}
-      className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
+      className={`rounded-full border px-3 py-2 text-sm transition-colors ${
         active
           ? 'border-primary bg-primary text-primary-foreground'
           : 'border-border hover:border-primary/50 hover:bg-accent'
@@ -52,11 +52,11 @@ function PlasterCard({ plaster }: { plaster: PlasterType }) {
 
         <div className="grid grid-cols-2 gap-2 text-xs rounded-md bg-muted/50 p-2">
           <div>
-            <span className="text-muted-foreground">Расход</span>
+            <span className="text-muted-foreground">Расход материала</span>
             <p className="font-medium">{plaster.coverageKgPerSqm} кг/м²</p>
           </div>
           <div>
-            <span className="text-muted-foreground">Высыхание</span>
+            <span className="text-muted-foreground">Время высыхания</span>
             <p className="font-medium flex items-center gap-1">
               <Clock className="h-3 w-3" /> {plaster.dryingTime}
             </p>
@@ -102,6 +102,7 @@ export function RecommendationsPage() {
   const [room, setRoom] = useState('')
   const [style, setStyle] = useState('')
   const [results, setResults] = useState<PlasterType[]>([])
+  const [noExactMatch, setNoExactMatch] = useState(false)
 
   const [browseMode, setBrowseMode] = useState(false)
 
@@ -110,14 +111,16 @@ export function RecommendationsPage() {
     if (surface) filtered = filtered.filter((p) => p.surfaces.includes(surface))
     if (room) filtered = filtered.filter((p) => p.rooms.includes(room))
     if (style) filtered = filtered.filter((p) => p.style.includes(style))
-    if (filtered.length === 0) filtered = PLASTERS
+    const fallback = filtered.length === 0
+    if (fallback) filtered = PLASTERS
+    setNoExactMatch(fallback)
     setResults(filtered)
     setStep('results')
   }
 
   const reset = () => {
     setSurface(''); setRoom(''); setStyle('')
-    setStep('surface'); setResults([])
+    setStep('surface'); setResults([]); setNoExactMatch(false)
   }
 
   if (browseMode) {
@@ -132,12 +135,15 @@ export function RecommendationsPage() {
             ← Мастер подбора
           </button>
         </div>
+        <p className="text-sm text-muted-foreground">Все доступные штукатурки с описанием и ценами.</p>
         <div className="space-y-3">
           {PLASTERS.map((p) => <PlasterCard key={p.id} plaster={p} />)}
         </div>
       </div>
     )
   }
+
+  const stepIndex = (['surface', 'room', 'style', 'results'] as Step[]).indexOf(step)
 
   return (
     <div className="mx-auto max-w-lg px-4 py-5 space-y-4">
@@ -153,25 +159,36 @@ export function RecommendationsPage() {
         )}
       </div>
 
+      {/* Hint for step 1 */}
+      {step === 'surface' && (
+        <div className="rounded-lg bg-muted/60 border border-border px-4 py-3 text-sm text-muted-foreground">
+          Ответьте на 3 вопроса — программа подберёт подходящие варианты штукатурки.
+          Можно пропустить любой вопрос, нажав «Далее».
+        </div>
+      )}
+
       {/* Progress */}
-      <div className="flex gap-1">
-        {(['surface', 'room', 'style', 'results'] as Step[]).map((s, i) => (
-          <div
-            key={s}
-            className={`h-1 flex-1 rounded-full transition-colors ${
-              (['surface', 'room', 'style', 'results'] as Step[]).indexOf(step) >= i
-                ? 'bg-primary'
-                : 'bg-muted'
-            }`}
-          />
-        ))}
+      <div className="space-y-1">
+        <div className="flex gap-1">
+          {(['surface', 'room', 'style', 'results'] as Step[]).map((s, i) => (
+            <div
+              key={s}
+              className={`h-1.5 flex-1 rounded-full transition-colors ${
+                stepIndex >= i ? 'bg-primary' : 'bg-muted'
+              }`}
+            />
+          ))}
+        </div>
+        <p className="text-xs text-muted-foreground text-right">
+          {stepIndex < 3 ? `Шаг ${stepIndex + 1} из 3` : 'Результаты'}
+        </p>
       </div>
 
       {step === 'surface' && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Тип поверхности</CardTitle>
-            <p className="text-sm text-muted-foreground">Что будем покрывать штукатуркой?</p>
+            <CardTitle className="text-base">Шаг 1 — Тип поверхности</CardTitle>
+            <p className="text-sm text-muted-foreground">Из чего сделана стена (или пол/потолок), которую нужно отделать?</p>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex flex-wrap gap-2">
@@ -179,6 +196,9 @@ export function RecommendationsPage() {
                 <FilterChip key={s} label={s} active={surface === s} onClick={() => setSurface(s === surface ? '' : s)} />
               ))}
             </div>
+            {!surface && (
+              <p className="text-xs text-muted-foreground">Не знаете — нажмите «Далее», пропустим этот вопрос.</p>
+            )}
             <Button className="w-full" onClick={() => setStep('room')}>
               Далее →
             </Button>
@@ -189,7 +209,7 @@ export function RecommendationsPage() {
       {step === 'room' && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Помещение / объект</CardTitle>
+            <CardTitle className="text-base">Шаг 2 — Помещение / объект</CardTitle>
             <p className="text-sm text-muted-foreground">Где будет применяться штукатурка?</p>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -198,6 +218,9 @@ export function RecommendationsPage() {
                 <FilterChip key={r} label={r} active={room === r} onClick={() => setRoom(r === room ? '' : r)} />
               ))}
             </div>
+            {!room && (
+              <p className="text-xs text-muted-foreground">Не знаете — нажмите «Далее», пропустим этот вопрос.</p>
+            )}
             <div className="flex gap-2">
               <Button variant="outline" className="flex-1" onClick={() => setStep('surface')}>← Назад</Button>
               <Button className="flex-1" onClick={() => setStep('style')}>Далее →</Button>
@@ -209,8 +232,8 @@ export function RecommendationsPage() {
       {step === 'style' && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Стиль интерьера</CardTitle>
-            <p className="text-sm text-muted-foreground">Какой стиль предпочитаете?</p>
+            <CardTitle className="text-base">Шаг 3 — Стиль интерьера</CardTitle>
+            <p className="text-sm text-muted-foreground">Какой стиль предпочитает клиент?</p>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex flex-wrap gap-2">
@@ -218,6 +241,9 @@ export function RecommendationsPage() {
                 <FilterChip key={s} label={s} active={style === s} onClick={() => setStyle(s === style ? '' : s)} />
               ))}
             </div>
+            {!style && (
+              <p className="text-xs text-muted-foreground">Не знаете — нажмите «Показать результаты».</p>
+            )}
             <div className="flex gap-2">
               <Button variant="outline" className="flex-1" onClick={() => setStep('room')}>← Назад</Button>
               <Button className="flex-1" onClick={runFilter}>Показать результаты</Button>
@@ -228,9 +254,16 @@ export function RecommendationsPage() {
 
       {step === 'results' && (
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">Найдено: {results.length} вариантов</p>
-          </div>
+          {noExactMatch ? (
+            <div className="flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2.5 text-sm text-amber-800">
+              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+              <span>По выбранным критериям совпадений не найдено. Показываем весь каталог — выберите подходящий вариант сами.</span>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Найдено подходящих вариантов: <strong>{results.length}</strong>
+            </p>
+          )}
 
           {/* Applied filters */}
           {(surface || room || style) && (

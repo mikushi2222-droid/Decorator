@@ -7,7 +7,8 @@ import { ru } from 'date-fns/locale'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Search, FileText } from 'lucide-react'
+import { Dialog } from '@/components/ui/dialog'
+import { Plus, Search, FileText, AlertTriangle } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import type { Invoice } from '@/types'
 import { InvoiceForm } from '@/components/InvoiceForm'
@@ -25,6 +26,12 @@ const STATUS_VARIANTS: Record<string, 'outline' | 'warning' | 'success'> = {
   paid: 'success',
 }
 
+const STATUS_BORDER: Record<string, string> = {
+  draft: 'border-l-4 border-l-border',
+  sent: 'border-l-4 border-l-amber-400',
+  paid: 'border-l-4 border-l-green-500',
+}
+
 export function InvoicesPage() {
   const invoices = useLiveQuery(
     () => db.invoices.orderBy('createdAt').reverse().toArray(),
@@ -34,6 +41,7 @@ export function InvoicesPage() {
   const [search, setSearch] = useState('')
   const [view, setView] = useState<'list' | 'create' | 'detail'>('list')
   const [selected, setSelected] = useState<Invoice | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Invoice | null>(null)
 
   const filtered = (invoices || []).filter(
     (inv) =>
@@ -60,9 +68,10 @@ export function InvoicesPage() {
     if (selected?.id === id) setSelected((prev) => prev ? { ...prev, status } : null)
   }
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('Удалить накладную?')) return
-    await db.invoices.delete(id)
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget?.id) return
+    await db.invoices.delete(deleteTarget.id)
+    setDeleteTarget(null)
     setView('list')
     setSelected(null)
   }
@@ -73,12 +82,31 @@ export function InvoicesPage() {
 
   if (view === 'detail' && selected) {
     return (
-      <InvoiceView
-        invoice={selected}
-        onBack={() => setView('list')}
-        onUpdateStatus={(s) => handleUpdateStatus(selected.id!, s)}
-        onDelete={() => handleDelete(selected.id!)}
-      />
+      <>
+        <InvoiceView
+          invoice={selected}
+          onBack={() => setView('list')}
+          onUpdateStatus={(s) => handleUpdateStatus(selected.id!, s)}
+          onDelete={() => setDeleteTarget(selected)}
+        />
+        <Dialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Удалить накладную?">
+          <div className="space-y-4">
+            <div className="flex items-start gap-3 rounded-md bg-destructive/10 px-3 py-3">
+              <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium">{deleteTarget?.number} — {deleteTarget?.clientName}</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Накладная будет удалена навсегда. Это действие нельзя отменить.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setDeleteTarget(null)}>Отмена</Button>
+              <Button variant="destructive" className="flex-1" onClick={handleDeleteConfirm}>Удалить</Button>
+            </div>
+          </div>
+        </Dialog>
+      </>
     )
   }
 
@@ -98,7 +126,7 @@ export function InvoicesPage() {
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           className="pl-9"
-          placeholder="Поиск по номеру или клиенту..."
+          placeholder="Поиск по номеру или имени клиента..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -107,35 +135,39 @@ export function InvoicesPage() {
       {filtered.length === 0 ? (
         <div className="py-16 text-center text-muted-foreground">
           <FileText className="mx-auto h-10 w-10 opacity-30 mb-3" />
-          <p className="text-sm">
-            {search ? 'Ничего не найдено' : 'Накладных пока нет.\nНажмите «Создать» для начала.'}
-          </p>
+          {search ? (
+            <p className="text-sm">Ничего не найдено по запросу «{search}»</p>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-foreground">Накладных пока нет</p>
+              <p className="text-sm">Нажмите кнопку «Создать» в правом верхнем углу, чтобы оформить первую накладную.</p>
+            </div>
+          )}
         </div>
       ) : (
         <div className="space-y-2">
           {filtered.map((inv) => (
             <Card
               key={inv.id}
-              className="cursor-pointer hover:border-primary/40 transition-colors"
+              className={`cursor-pointer hover:shadow-md transition-all overflow-hidden ${STATUS_BORDER[inv.status]}`}
               onClick={() => { setSelected(inv); setView('detail') }}
             >
               <CardContent className="p-4">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span className="font-mono text-sm font-medium">{inv.number}</span>
+                    <div className="flex items-center gap-2 mb-1">
                       <Badge variant={STATUS_VARIANTS[inv.status]}>
                         {STATUS_LABELS[inv.status]}
                       </Badge>
+                      <span className="font-mono text-xs text-muted-foreground">{inv.number}</span>
                     </div>
-                    <p className="font-medium truncate">{inv.clientName || '—'}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {format(new Date(inv.date), 'd MMMM yyyy', { locale: ru })}
+                    <p className="font-semibold truncate text-base leading-tight">{inv.clientName || '—'}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {format(new Date(inv.date), 'd MMMM yyyy', { locale: ru })} · {inv.items.length} поз.
                     </p>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="font-bold text-primary">{formatCurrency(inv.total)}</p>
-                    <p className="text-xs text-muted-foreground">{inv.items.length} позиц.</p>
+                    <p className="font-bold text-primary text-lg leading-tight">{formatCurrency(inv.total)}</p>
                   </div>
                 </div>
               </CardContent>
