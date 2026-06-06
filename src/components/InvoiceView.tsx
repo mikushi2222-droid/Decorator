@@ -1,4 +1,3 @@
-import { useRef } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/lib/db'
 import { formatCurrency } from '@/lib/utils'
@@ -8,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ArrowLeft, Printer, Trash2, CheckCircle, Send } from 'lucide-react'
 import type { Invoice } from '@/types'
-import { useReactToPrint } from 'react-to-print'
+import { usePrint } from '@/hooks/usePrint'
 
 interface Props {
   invoice: Invoice
@@ -26,8 +25,7 @@ const STATUS_VARIANTS: Record<string, 'outline' | 'warning' | 'success'> = {
 
 export function InvoiceView({ invoice, onBack, onUpdateStatus, onDelete }: Props) {
   const settings = useLiveQuery(() => db.settings.toArray().then((s) => s[0]))
-  const printRef = useRef<HTMLDivElement>(null)
-  const handlePrint = useReactToPrint({ contentRef: printRef })
+  const { printRef, handlePrint } = usePrint()
 
   return (
     <div className="mx-auto max-w-lg px-4 py-5 space-y-4">

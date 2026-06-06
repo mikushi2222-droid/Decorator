@@ -5,12 +5,13 @@ import { formatCurrency } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { ArrowLeft, Plus, Trash2 } from 'lucide-react'
 import type { Invoice, InvoiceItem } from '@/types'
 
 interface Props {
-  onSave: (data: Omit<Invoice, 'id' | 'number' | 'createdAt'>) => void
+  onSave: (data: Omit<Invoice, 'id' | 'number' | 'createdAt'>) => Promise<void>
   onCancel: () => void
 }
 
@@ -31,6 +32,8 @@ export function InvoiceForm({ onSave, onCancel }: Props) {
   const [items, setItems] = useState<InvoiceItem[]>([emptyItem()])
   const [discount, setDiscount] = useState('')
   const [notes, setNotes] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
 
   const updateItem = (idx: number, field: keyof InvoiceItem, value: string | number) => {
     setItems((prev) => prev.map((item, i) => i === idx ? { ...item, [field]: value } : item))
@@ -57,28 +60,46 @@ export function InvoiceForm({ onSave, onCancel }: Props) {
   const discountAmt = parseFloat(discount) || 0
   const total = Math.max(0, subtotal - discountAmt)
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!clientName.trim()) {
-      alert('Укажите имя клиента')
+      setError('Укажите имя клиента')
       return
     }
     if (items.some((i) => !i.productName.trim())) {
-      alert('Заполните все позиции')
+      setError('Заполните наименование во всех позициях')
       return
     }
-    onSave({
-      date: new Date(date),
-      clientName,
-      clientPhone,
-      clientAddress,
-      items,
-      subtotal,
-      discount: discountAmt,
-      total,
-      status: 'draft',
-      notes,
-    })
+    if (items.some((i) => i.quantity <= 0)) {
+      setError('Количество должно быть больше нуля')
+      return
+    }
+    setError('')
+    setSaving(true)
+    try {
+      // Парсим дату как локальную полночь (не UTC), чтобы избежать сдвига
+      // на −1 день у пользователей в часовых поясах западнее UTC.
+      await onSave({
+        date: new Date(date + 'T00:00:00'),
+        clientName,
+        clientPhone,
+        clientAddress,
+        items,
+        subtotal,
+        discount: discountAmt,
+        total,
+        status: 'draft',
+        notes,
+      })
+    } catch {
+      setError('Ошибка сохранения. Попробуйте ещё раз.')
+      setSaving(false)
+    }
   }
+
+  const catalogOptions = (products || []).map((p) => ({
+    value: String(p.id),
+    label: `${p.name} — ${formatCurrency(p.price)}/${p.unit}`,
+  }))
 
   return (
     <div className="mx-auto max-w-lg px-4 py-5 space-y-4">
@@ -116,23 +137,14 @@ export function InvoiceForm({ onSave, onCancel }: Props) {
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
-          {/* Quick add from catalog */}
-          {(products || []).length > 0 && (
-            <div>
-              <label className="text-xs text-muted-foreground mb-1 block">Быстрое добавление из каталога</label>
-              <select
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value=""
-                onChange={(e) => addProduct(e.target.value)}
-              >
-                <option value="">— Выбрать из каталога —</option>
-                {(products || []).map((p) => (
-                  <option key={p.id} value={String(p.id)}>
-                    {p.name} — {formatCurrency(p.price)}/{p.unit}
-                  </option>
-                ))}
-              </select>
-            </div>
+          {/* Быстрое добавление из каталога через общий компонент Select */}
+          {catalogOptions.length > 0 && (
+            <Select
+              options={catalogOptions}
+              value=""
+              onChange={(e) => addProduct(e.target.value)}
+              placeholder="— Добавить из каталога —"
+            />
           )}
 
           {items.map((item, idx) => (
@@ -208,9 +220,17 @@ export function InvoiceForm({ onSave, onCancel }: Props) {
         rows={3}
       />
 
+      {error && (
+        <p className="text-sm text-destructive rounded-md bg-destructive/10 px-3 py-2">{error}</p>
+      )}
+
       <div className="flex gap-2 pb-4">
-        <Button variant="outline" className="flex-1" onClick={onCancel}>Отмена</Button>
-        <Button className="flex-1" onClick={handleSave}>Сохранить</Button>
+        <Button variant="outline" className="flex-1" onClick={onCancel} disabled={saving}>
+          Отмена
+        </Button>
+        <Button className="flex-1" onClick={handleSave} disabled={saving}>
+          {saving ? 'Сохранение...' : 'Сохранить'}
+        </Button>
       </div>
     </div>
   )

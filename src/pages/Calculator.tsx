@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/lib/db'
 import { formatCurrency, formatNumber } from '@/lib/utils'
@@ -8,9 +8,8 @@ import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Calculator as CalcIcon, Printer, RotateCcw, ChevronRight } from 'lucide-react'
-import type { CalcMode, LaborRate, Product } from '@/types'
-import { useRef } from 'react'
-import { useReactToPrint } from 'react-to-print'
+import type { CalcMode, LaborRate } from '@/types'
+import { usePrint } from '@/hooks/usePrint'
 
 type AreaMode = 'dimensions' | 'direct'
 
@@ -39,9 +38,9 @@ export function CalculatorPage() {
   const [mode, setMode] = useState<CalcMode>('both')
   const [selectedRates, setSelectedRates] = useState<number[]>([])
   const [result, setResult] = useState<CalcResult | null>(null)
+  const [areaError, setAreaError] = useState('')
 
-  const printRef = useRef<HTMLDivElement>(null)
-  const handlePrint = useReactToPrint({ contentRef: printRef })
+  const { printRef, handlePrint } = usePrint()
 
   const productOptions = (products || []).map((p) => ({
     value: String(p.id),
@@ -65,7 +64,11 @@ export function CalculatorPage() {
 
   const calculate = () => {
     const totalArea = calcArea()
-    if (totalArea <= 0) return
+    if (totalArea <= 0) {
+      setAreaError('Введите площадь больше нуля')
+      return
+    }
+    setAreaError('')
 
     const product = products?.find((p) => String(p.id) === productId)
     const pack = parseFloat(packSize) || 25
@@ -101,7 +104,7 @@ export function CalculatorPage() {
 
   const reset = () => {
     setLength(''); setWidth(''); setHeight(''); setArea('')
-    setProductId(''); setResult(null); setSelectedRates([])
+    setProductId(''); setResult(null); setSelectedRates([]); setAreaError('')
   }
 
   const toggleRate = (id: number) => {
@@ -246,6 +249,10 @@ export function CalculatorPage() {
             ))}
           </CardContent>
         </Card>
+      )}
+
+      {areaError && (
+        <p className="text-sm text-destructive rounded-md bg-destructive/10 px-3 py-2">{areaError}</p>
       )}
 
       {/* Calculate button */}

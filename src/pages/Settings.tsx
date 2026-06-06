@@ -65,18 +65,28 @@ function ProductsSection() {
   const [price, setPrice] = useState('')
   const [coverage, setCoverage] = useState('')
   const [category, setCategory] = useState('')
+  const [saveError, setSaveError] = useState('')
 
   const save = async () => {
-    if (!name || !price) return
-    await db.products.add({
-      name, unit,
-      price: parseFloat(price) || 0,
-      coverage: parseFloat(coverage) || 0,
-      category,
-      description: '',
-    })
-    setShowDialog(false)
-    setName(''); setPrice(''); setCoverage(''); setCategory('')
+    const parsedPrice = parseFloat(price)
+    const parsedCoverage = parseFloat(coverage)
+    if (!name.trim()) { setSaveError('Укажите название'); return }
+    if (!parsedPrice || parsedPrice <= 0) { setSaveError('Укажите цену'); return }
+    if (!parsedCoverage || parsedCoverage <= 0) { setSaveError('Укажите расход > 0 (иначе калькулятор вернёт 0 пачек)'); return }
+    setSaveError('')
+    try {
+      await db.products.add({
+        name: name.trim(), unit,
+        price: parsedPrice,
+        coverage: parsedCoverage,
+        category,
+        description: '',
+      })
+      setShowDialog(false)
+      setName(''); setPrice(''); setCoverage(''); setCategory('')
+    } catch {
+      setSaveError('Ошибка сохранения. Попробуйте ещё раз.')
+    }
   }
 
   return (
@@ -123,10 +133,11 @@ function ProductsSection() {
             <Input label="Ед. измерения" value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="кг" />
             <Input label="Цена за ед." type="number" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0" />
           </div>
-          <Input label="Расход (ед./м²)" type="number" value={coverage} onChange={(e) => setCoverage(e.target.value)} placeholder="3.5" />
+          <Input label="Расход (ед./м²)" type="number" value={coverage} onChange={(e) => setCoverage(e.target.value)} placeholder="3.5" hint="Кг или л на 1 м²" />
           <Input label="Категория" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Фактурные" />
+          {saveError && <p className="text-xs text-destructive">{saveError}</p>}
           <div className="flex gap-2 pt-1">
-            <Button variant="outline" className="flex-1" onClick={() => setShowDialog(false)}>Отмена</Button>
+            <Button variant="outline" className="flex-1" onClick={() => { setShowDialog(false); setSaveError('') }}>Отмена</Button>
             <Button className="flex-1" onClick={save}>Добавить</Button>
           </div>
         </div>
@@ -141,12 +152,20 @@ function LaborSection() {
   const [name, setName] = useState('')
   const [price, setPrice] = useState('')
   const [unit, setUnit] = useState('м²')
+  const [saveError, setSaveError] = useState('')
 
   const save = async () => {
-    if (!name || !price) return
-    await db.laborRates.add({ name, pricePerSqm: parseFloat(price) || 0, unit })
-    setShowDialog(false)
-    setName(''); setPrice('')
+    const parsedPrice = parseFloat(price)
+    if (!name.trim()) { setSaveError('Укажите название'); return }
+    if (!parsedPrice || parsedPrice <= 0) { setSaveError('Укажите ставку > 0'); return }
+    setSaveError('')
+    try {
+      await db.laborRates.add({ name: name.trim(), pricePerSqm: parsedPrice, unit })
+      setShowDialog(false)
+      setName(''); setPrice('')
+    } catch {
+      setSaveError('Ошибка сохранения. Попробуйте ещё раз.')
+    }
   }
 
   return (
@@ -187,8 +206,9 @@ function LaborSection() {
             <Input label="Ставка" type="number" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="450" />
             <Input label="Единица" value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="м²" />
           </div>
+          {saveError && <p className="text-xs text-destructive">{saveError}</p>}
           <div className="flex gap-2 pt-1">
-            <Button variant="outline" className="flex-1" onClick={() => setShowDialog(false)}>Отмена</Button>
+            <Button variant="outline" className="flex-1" onClick={() => { setShowDialog(false); setSaveError('') }}>Отмена</Button>
             <Button className="flex-1" onClick={save}>Добавить</Button>
           </div>
         </div>

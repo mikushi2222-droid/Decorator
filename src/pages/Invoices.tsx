@@ -42,8 +42,11 @@ export function InvoicesPage() {
   )
 
   const handleCreate = async (data: Omit<Invoice, 'id' | 'number' | 'createdAt'>) => {
-    const count = await db.invoices.count()
-    const number = generateInvoiceNumber(count)
+    // Берём максимальный существующий порядковый номер (не count),
+    // чтобы удалённые накладные не вызывали дублирование номеров.
+    const last = await db.invoices.orderBy('number').last()
+    const lastNum = last ? parseInt(last.number.split('-')[2] ?? '0', 10) : 0
+    const number = generateInvoiceNumber(isNaN(lastNum) ? 0 : lastNum)
     await db.invoices.add({
       ...data,
       number,
