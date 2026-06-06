@@ -170,7 +170,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
               _dropdown<double>(
                 label: 'Фасовка упаковки',
                 value: _packSize,
-                items: const {5.0: '5 кг', 10.0: '10 кг', 15.0: '15 кг', 25.0: '25 кг', 30.0: '30 кг'},
+                items: {5.0: '5 кг', 10.0: '10 кг', 15.0: '15 кг', 25.0: '25 кг', 30.0: '30 кг'},
                 onChanged: (v) => setState(() => _packSize = v!),
               ),
             ]),
