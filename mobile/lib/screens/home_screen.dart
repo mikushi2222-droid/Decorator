@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import '../database.dart';
 import '../main.dart';
 import 'calculator_screen.dart';
 import 'invoices_screen.dart';
 import 'catalog_screen.dart';
 import 'settings_screen.dart';
+import 'onboarding_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -28,6 +30,25 @@ class _HomeScreenState extends State<HomeScreen> {
     NavigationDestination(icon: Icon(Icons.search_outlined), selectedIcon: Icon(Icons.search), label: 'Каталог'),
     NavigationDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: 'Настройки'),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkOnboarding());
+  }
+
+  Future<void> _checkOnboarding() async {
+    final shown = await AppDatabase.instance.isOnboardingShown();
+    if (!shown && mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const OnboardingScreen(),
+          fullscreenDialog: true,
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
