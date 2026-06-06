@@ -29,12 +29,15 @@ async function seedIfEmpty() {
     const productCount = await db.products.count()
     if (productCount === 0) {
       await db.products.bulkAdd([
-        { name: 'Штукатурка декоративная "Короед" 2мм', unit: 'кг', price: 320, coverage: 3.5, category: 'Фактурные', description: 'Классическая фактура для фасадов и интерьеров' },
-        { name: 'Штукатурка "Венецианская"', unit: 'кг', price: 850, coverage: 0.4, category: 'Декоративные', description: 'Имитация мрамора, полированная поверхность' },
-        { name: 'Штукатурка "Травертин"', unit: 'кг', price: 490, coverage: 1.2, category: 'Декоративные', description: 'Имитация натурального камня' },
-        { name: 'Штукатурка "Шуба" 2.5мм', unit: 'кг', price: 280, coverage: 4.0, category: 'Фактурные', description: 'Грубая фактурная поверхность' },
-        { name: 'Штукатурка "Мокрый шёлк"', unit: 'кг', price: 720, coverage: 0.3, category: 'Перламутровые', description: 'Эффект шёлка с перламутровым блеском' },
-        { name: 'Штукатурка "Камешковая" 1.5мм', unit: 'кг', price: 310, coverage: 2.8, category: 'Фактурные', description: 'Мелкая зернистая поверхность' },
+        { name: 'DECORAZZA Stucco Veneziano', unit: 'кг', price: 980, coverage: 0.35, category: 'DECORAZZA', description: 'Венецианская штукатурка, эффект полированного мрамора' },
+        { name: 'DECORAZZA Art Beton', unit: 'кг', price: 720, coverage: 0.8, category: 'DECORAZZA', description: 'Эффект декоративного бетона, стиль лофт' },
+        { name: 'DECORAZZA Travertino Naturale', unit: 'кг', price: 540, coverage: 1.2, category: 'DECORAZZA', description: 'Имитация натурального травертина' },
+        { name: 'DECORAZZA Romano', unit: 'кг', price: 420, coverage: 2.5, category: 'DECORAZZA', description: 'Фактурная штукатурка для фасадов и интерьеров' },
+        { name: 'DECORAZZA Rustic', unit: 'кг', price: 380, coverage: 3.0, category: 'DECORAZZA', description: 'Грубая фактура, вид натурального камня' },
+        { name: 'DECORAZZA Barilievo', unit: 'кг', price: 580, coverage: 1.8, category: 'DECORAZZA', description: 'Рельефная штукатурка с объёмными узорами' },
+        { name: 'BAYRAMIX Mineral', unit: 'кг', price: 220, coverage: 3.2, category: 'BAYRAMIX', description: 'Минеральная фасадная штукатурка' },
+        { name: 'BAYRAMIX Baytera (Короед)', unit: 'кг', price: 260, coverage: 3.5, category: 'BAYRAMIX', description: 'Фактурная штукатурка типа короед' },
+        { name: 'BAYRAMIX Gravol (Камешковая)', unit: 'кг', price: 240, coverage: 2.8, category: 'BAYRAMIX', description: 'Зернистая штукатурка, тип камешковая' },
         { name: 'Грунтовка адгезионная', unit: 'л', price: 180, coverage: 6.0, category: 'Расходники', description: 'Под декоративные штукатурки' },
         { name: 'Воск защитный прозрачный', unit: 'л', price: 420, coverage: 8.0, category: 'Расходники', description: 'Финишная защита поверхности' },
       ])

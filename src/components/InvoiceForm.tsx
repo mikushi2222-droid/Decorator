@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { ArrowLeft, Plus, Trash2 } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Info } from 'lucide-react'
 import type { Invoice, InvoiceItem } from '@/types'
 
 interface Props {
@@ -62,22 +62,21 @@ export function InvoiceForm({ onSave, onCancel }: Props) {
 
   const handleSave = async () => {
     if (!clientName.trim()) {
-      setError('Укажите имя клиента')
+      setError('Укажите имя клиента — это обязательное поле')
       return
     }
     if (items.some((i) => !i.productName.trim())) {
-      setError('Заполните наименование во всех позициях')
+      setError('Заполните наименование во всех позициях товара')
       return
     }
     if (items.some((i) => i.quantity <= 0)) {
-      setError('Количество должно быть больше нуля')
+      setError('Количество в каждой позиции должно быть больше нуля')
       return
     }
     setError('')
     setSaving(true)
     try {
-      // Парсим дату как локальную полночь (не UTC), чтобы избежать сдвига
-      // на −1 день у пользователей в часовых поясах западнее UTC.
+      // Парсим дату как локальную полночь (не UTC), чтобы избежать сдвига на −1 день
       await onSave({
         date: new Date(date + 'T00:00:00'),
         clientName,
@@ -110,53 +109,90 @@ export function InvoiceForm({ onSave, onCancel }: Props) {
         <h1 className="text-xl font-bold">Новая накладная</h1>
       </div>
 
-      {/* Client */}
+      {/* Hint */}
+      <div className="flex items-start gap-2 rounded-lg bg-muted/60 border border-border px-4 py-3 text-sm text-muted-foreground">
+        <Info className="h-4 w-4 shrink-0 mt-0.5 text-primary" />
+        <span>Заполните данные клиента и список товаров. Позиции можно добавить из каталога или написать вручную.</span>
+      </div>
+
+      {/* Step 1 — Client */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Клиент</CardTitle>
+          <CardTitle className="text-base">Шаг 1 — Данные клиента</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <Input label="Имя / Организация" value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Иванов Иван" />
-          <Input label="Телефон" type="tel" value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} placeholder="+7 (999) 000-00-00" />
-          <Input label="Адрес объекта" value={clientAddress} onChange={(e) => setClientAddress(e.target.value)} placeholder="ул. Примерная, д. 1" />
-          <Input label="Дата" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          <Input
+            label="Имя / Организация *"
+            value={clientName}
+            onChange={(e) => setClientName(e.target.value)}
+            placeholder="Иванов Иван Иванович"
+            hint="Обязательное поле — отображается на накладной"
+          />
+          <Input
+            label="Телефон"
+            type="tel"
+            value={clientPhone}
+            onChange={(e) => setClientPhone(e.target.value)}
+            placeholder="+7 (999) 000-00-00"
+          />
+          <Input
+            label="Адрес объекта"
+            value={clientAddress}
+            onChange={(e) => setClientAddress(e.target.value)}
+            placeholder="ул. Примерная, д. 1, кв. 5"
+          />
+          <Input
+            label="Дата накладной"
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+          />
         </CardContent>
       </Card>
 
-      {/* Items */}
+      {/* Step 2 — Items */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="text-base">Позиции</CardTitle>
+            <CardTitle className="text-base">Шаг 2 — Товары и услуги</CardTitle>
             <button
               onClick={() => setItems((prev) => [...prev, emptyItem()])}
               className="flex items-center gap-1 text-sm text-primary hover:underline"
             >
-              <Plus className="h-3.5 w-3.5" /> Добавить
+              <Plus className="h-3.5 w-3.5" /> Добавить строку
             </button>
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
-          {/* Быстрое добавление из каталога через общий компонент Select */}
+          {/* Quick add from catalog */}
           {catalogOptions.length > 0 && (
-            <Select
-              options={catalogOptions}
-              value=""
-              onChange={(e) => addProduct(e.target.value)}
-              placeholder="— Добавить из каталога —"
-            />
+            <div className="space-y-1">
+              <Select
+                options={catalogOptions}
+                value=""
+                onChange={(e) => addProduct(e.target.value)}
+                placeholder="— Добавить из каталога —"
+              />
+              <p className="text-xs text-muted-foreground">
+                Выберите из каталога — или заполните строки ниже вручную.
+              </p>
+            </div>
           )}
 
           {items.map((item, idx) => (
             <div key={idx} className="rounded-lg border border-border p-3 space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-muted-foreground">Позиция {idx + 1}</span>
-                <button onClick={() => removeItem(idx)} className="text-muted-foreground hover:text-destructive">
+                <button
+                  onClick={() => removeItem(idx)}
+                  className="text-muted-foreground hover:text-destructive"
+                  title="Удалить позицию"
+                >
                   <Trash2 className="h-4 w-4" />
                 </button>
               </div>
               <Input
-                placeholder="Наименование товара"
+                placeholder="Название товара или услуги, например: BAYRAMIX Baytera 25кг"
                 value={item.productName}
                 onChange={(e) => updateItem(idx, 'productName', e.target.value)}
               />
@@ -168,29 +204,38 @@ export function InvoiceForm({ onSave, onCancel }: Props) {
                   onChange={(e) => updateItem(idx, 'quantity', parseFloat(e.target.value) || 0)}
                 />
                 <Input
-                  label="Ед."
+                  label="Ед. изм."
                   value={item.unit}
                   onChange={(e) => updateItem(idx, 'unit', e.target.value)}
                   placeholder="кг"
                 />
                 <Input
-                  label="Цена"
+                  label="Цена, ₽"
                   type="number"
                   value={item.price}
                   onChange={(e) => updateItem(idx, 'price', parseFloat(e.target.value) || 0)}
                 />
               </div>
-              <div className="text-right text-sm font-medium">
-                = {formatCurrency(item.quantity * item.price)}
+              <div className="text-right text-sm font-medium text-primary">
+                Сумма: {formatCurrency(item.quantity * item.price)}
               </div>
             </div>
           ))}
+
+          {items.length === 0 && (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              Нет позиций. Нажмите «Добавить строку» выше.
+            </p>
+          )}
         </CardContent>
       </Card>
 
-      {/* Totals */}
+      {/* Step 3 — Totals */}
       <Card>
-        <CardContent className="pt-4 space-y-2">
+        <CardHeader>
+          <CardTitle className="text-base">Шаг 3 — Итоговая сумма</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Подытог</span>
             <span>{formatCurrency(subtotal)}</span>
@@ -206,17 +251,17 @@ export function InvoiceForm({ onSave, onCancel }: Props) {
             />
           </div>
           <div className="flex justify-between font-bold border-t border-border pt-2">
-            <span>Итого</span>
+            <span>К оплате</span>
             <span className="text-primary text-lg">{formatCurrency(total)}</span>
           </div>
         </CardContent>
       </Card>
 
       <Textarea
-        label="Примечания"
+        label="Примечания (необязательно)"
         value={notes}
         onChange={(e) => setNotes(e.target.value)}
-        placeholder="Условия оплаты, особые договорённости..."
+        placeholder="Условия оплаты, срок выполнения, особые договорённости..."
         rows={3}
       />
 
@@ -229,7 +274,7 @@ export function InvoiceForm({ onSave, onCancel }: Props) {
           Отмена
         </Button>
         <Button className="flex-1" onClick={handleSave} disabled={saving}>
-          {saving ? 'Сохранение...' : 'Сохранить'}
+          {saving ? 'Сохранение...' : 'Сохранить накладную'}
         </Button>
       </div>
     </div>

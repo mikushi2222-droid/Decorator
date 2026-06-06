@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { Calculator as CalcIcon, Printer, RotateCcw, ChevronRight } from 'lucide-react'
+import { Calculator as CalcIcon, Printer, RotateCcw, ChevronRight, Info } from 'lucide-react'
 import type { CalcMode, LaborRate } from '@/types'
 import { usePrint } from '@/hooks/usePrint'
 
@@ -44,13 +44,13 @@ export function CalculatorPage() {
 
   const productOptions = (products || []).map((p) => ({
     value: String(p.id),
-    label: `${p.name} (${p.coverage} кг/м²)`,
+    label: `${p.name} (расход ${p.coverage} кг/м²)`,
   }))
 
   const modeOptions: { value: CalcMode; label: string }[] = [
-    { value: 'both', label: 'Материал + работа' },
-    { value: 'material', label: 'Только материал' },
-    { value: 'labor', label: 'Только работа' },
+    { value: 'both', label: 'Материал + работа (полная стоимость)' },
+    { value: 'material', label: 'Только материал (без работы)' },
+    { value: 'labor', label: 'Только работа (без материала)' },
   ]
 
   const calcArea = (): number => {
@@ -123,21 +123,35 @@ export function CalculatorPage() {
         </button>
       </div>
 
+      {/* How-to hint */}
+      <div className="flex items-start gap-2 rounded-lg bg-muted/60 border border-border px-4 py-3 text-sm text-muted-foreground">
+        <Info className="h-4 w-4 shrink-0 mt-0.5 text-primary" />
+        <div>
+          <p className="font-medium text-foreground mb-0.5">Как рассчитать стоимость:</p>
+          <ol className="list-decimal list-inside space-y-0.5">
+            <li>Введите размеры помещения</li>
+            <li>Выберите штукатурку и фасовку</li>
+            <li>Отметьте виды работ (если нужно)</li>
+            <li>Нажмите «Рассчитать»</li>
+          </ol>
+        </div>
+      </div>
+
       {/* Area input */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Площадь</CardTitle>
+          <CardTitle className="text-base">Шаг 1 — Площадь</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex rounded-lg border border-border overflow-hidden text-sm">
             <button
-              className={`flex-1 py-2 transition-colors ${areaMode === 'dimensions' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'}`}
+              className={`flex-1 py-2.5 transition-colors ${areaMode === 'dimensions' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'}`}
               onClick={() => setAreaMode('dimensions')}
             >
               По размерам
             </button>
             <button
-              className={`flex-1 py-2 transition-colors ${areaMode === 'direct' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'}`}
+              className={`flex-1 py-2.5 transition-colors ${areaMode === 'direct' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'}`}
               onClick={() => setAreaMode('direct')}
             >
               Ввести площадь
@@ -146,32 +160,38 @@ export function CalculatorPage() {
 
           {areaMode === 'dimensions' ? (
             <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">Введите длину и ширину комнаты в метрах.</p>
               <div className="grid grid-cols-2 gap-2">
                 <Input label="Длина, м" type="number" value={length} onChange={(e) => setLength(e.target.value)} placeholder="0" />
                 <Input label="Ширина, м" type="number" value={width} onChange={(e) => setWidth(e.target.value)} placeholder="0" />
               </div>
               <Input
-                label="Высота стен, м (для стен)"
+                label="Высота стен, м"
                 type="number"
                 value={height}
                 onChange={(e) => setHeight(e.target.value)}
                 placeholder="Оставьте пустым для пола/потолка"
-                hint={height ? `Периметр × высоту = площадь стен` : `Без высоты — длина × ширина`}
+                hint={height
+                  ? `Площадь стен: (${length || '0'} + ${width || '0'}) × 2 × ${height} = ${formatNumber(calcArea())} м²`
+                  : 'Для стен введите высоту потолка. Для пола или потолка — оставьте пустым.'}
               />
               {calcArea() > 0 && (
-                <div className="rounded-md bg-muted px-3 py-2 text-sm">
-                  Расчётная площадь: <strong>{formatNumber(calcArea())} м²</strong>
+                <div className="rounded-md bg-primary/10 border border-primary/20 px-3 py-2 text-sm font-medium">
+                  Расчётная площадь: {formatNumber(calcArea())} м²
                 </div>
               )}
             </div>
           ) : (
-            <Input
-              label="Площадь, м²"
-              type="number"
-              value={area}
-              onChange={(e) => setArea(e.target.value)}
-              placeholder="0"
-            />
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">Введите готовую площадь, если она уже известна.</p>
+              <Input
+                label="Площадь, м²"
+                type="number"
+                value={area}
+                onChange={(e) => setArea(e.target.value)}
+                placeholder="0"
+              />
+            </div>
           )}
         </CardContent>
       </Card>
@@ -179,14 +199,19 @@ export function CalculatorPage() {
       {/* Mode */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Что считаем</CardTitle>
+          <CardTitle className="text-base">Шаг 2 — Что считаем</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-2">
           <Select
             options={modeOptions}
             value={mode}
             onChange={(e) => setMode(e.target.value as CalcMode)}
           />
+          <p className="text-xs text-muted-foreground">
+            {mode === 'both' && 'Посчитает и стоимость материала, и стоимость работ.'}
+            {mode === 'material' && 'Только материал — сколько штукатурки нужно купить.'}
+            {mode === 'labor' && 'Только работа — сколько стоит нанесение без материала.'}
+          </p>
         </CardContent>
       </Card>
 
@@ -194,7 +219,7 @@ export function CalculatorPage() {
       {mode !== 'labor' && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Материал</CardTitle>
+            <CardTitle className="text-base">Шаг 3 — Материал</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <Select
@@ -202,15 +227,20 @@ export function CalculatorPage() {
               options={productOptions}
               value={productId}
               onChange={(e) => setProductId(e.target.value)}
-              placeholder="— Выберите штукатурку —"
+              placeholder="— Выберите из каталога —"
             />
+            {!productId && (
+              <p className="text-xs text-muted-foreground">
+                Если нужного товара нет в списке — добавьте его в разделе «Настройки → Каталог товаров».
+              </p>
+            )}
             <Select
               label="Фасовка упаковки"
               options={[
                 { value: '5', label: '5 кг' },
                 { value: '10', label: '10 кг' },
                 { value: '15', label: '15 кг' },
-                { value: '25', label: '25 кг' },
+                { value: '25', label: '25 кг (стандарт)' },
                 { value: '30', label: '30 кг' },
               ]}
               value={packSize}
@@ -224,14 +254,18 @@ export function CalculatorPage() {
       {mode !== 'material' && (laborRates || []).length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Работы</CardTitle>
+            <CardTitle className="text-base">
+              {mode === 'labor' ? 'Шаг 3 — Виды работ' : 'Шаг 4 — Виды работ'}
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            <p className="text-xs text-muted-foreground mb-2">Выберите нужные виды работ</p>
+            <p className="text-xs text-muted-foreground">
+              Отметьте галочками все работы, которые входят в смету.
+            </p>
             {(laborRates || []).map((r) => (
               <label
                 key={r.id}
-                className={`flex items-center justify-between rounded-md border px-3 py-2.5 cursor-pointer transition-colors ${
+                className={`flex items-center justify-between rounded-md border px-3 py-3 cursor-pointer transition-colors ${
                   selectedRates.includes(r.id!) ? 'border-primary bg-primary/5' : 'border-border hover:bg-accent'
                 }`}
               >
@@ -297,12 +331,22 @@ export function CalculatorPage() {
                     </div>
                   </>
                 )}
+                {mode !== 'labor' && !productId && result.area > 0 && (
+                  <div className="px-3 py-2 text-xs text-muted-foreground italic">
+                    Штукатурка не выбрана — стоимость материала не посчитана
+                  </div>
+                )}
                 {result.selectedLaborRates.map(({ rate, sqmCost }) => (
                   <div key={rate.id} className="flex justify-between px-3 py-2">
                     <span className="text-muted-foreground">{rate.name}</span>
                     <span className="font-medium">{formatCurrency(sqmCost)}</span>
                   </div>
                 ))}
+                {mode !== 'material' && result.selectedLaborRates.length === 0 && (
+                  <div className="px-3 py-2 text-xs text-muted-foreground italic">
+                    Виды работ не выбраны — стоимость работ не посчитана
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center justify-between rounded-lg bg-primary px-4 py-3">
