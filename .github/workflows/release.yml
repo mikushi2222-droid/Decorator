@@ -1,0 +1,91 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install frontend deps
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Install goversioninfo
+        run: go install github.com/josephspurrier/goversioninfo/cmd/goversioninfo@latest
+
+      - name: Generate Windows resource (version info)
+        run: goversioninfo -o resource_windows_amd64.syso versioninfo.json
+
+      - name: Build Windows executable
+        env:
+          GOOS: windows
+          GOARCH: amd64
+          CGO_ENABLED: '0'
+        run: go build -ldflags="-s -w" -trimpath -o "Dekorator.exe" .
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Декоратор ${{ github.ref_name }}"
+          body: |
+            ## Декоратор ${{ github.ref_name }} — приложение для ООО «АКЦЕНТ»
+
+            Офлайн-приложение для оформления расходных накладных, расчёта штукатурки и работы с каталогом РРЦ.
+            Работает без интернета. Все данные хранятся локально на компьютере.
+
+            ---
+
+            ### 📥 Установка
+
+            1. Скачайте файл **`Dekorator.exe`** ниже
+            2. Запустите его двойным кликом — откроется браузер с приложением
+            3. Оставьте окно программы открытым пока работаете
+
+            ---
+
+            ### ⚠️ Предупреждение Windows SmartScreen
+
+            При первом запуске Windows покажет: **«Windows защитила ваш компьютер»**.
+            Это стандартное поведение для новых программ без платной цифровой подписи — **не вирус**.
+
+            **Как запустить:**
+            1. Нажмите **«Подробнее»** (мелкая ссылка под текстом предупреждения)
+            2. Нажмите **«Выполнить в любом случае»**
+
+            > Приложение работает только локально (127.0.0.1) и не имеет доступа к интернету.
+
+            ---
+
+            ### 📦 Что включено в ${{ github.ref_name }}
+
+            - Каталог РРЦ: **552 позиции** (KIITOS · OLSTA · DECORAZZA · BAYRAMIX · PRORAB · Инструменты · ECOTINT)
+            - Поиск товаров с фильтрацией по брендам
+            - Экспорт накладных в **PDF** и **Word (.docx)**
+            - Полные реквизиты ООО «АКЦЕНТ» на накладных
+            - Калькулятор материала и работ
+          files: "Dekorator.exe"
+          draft: false
+          prerelease: false
