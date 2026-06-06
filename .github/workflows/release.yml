@@ -61,7 +61,7 @@ jobs:
           GOOS: windows
           GOARCH: amd64
           CGO_ENABLED: '0'
-        run: go build -ldflags="-s -w" -trimpath -o "Dekorator.exe" .
+        run: go build -ldflags="-s -w" -trimpath -o "Декоратор.exe" .
 
       - name: Create git tag (workflow_dispatch only)
         if: github.event_name == 'workflow_dispatch'
@@ -86,7 +86,7 @@ jobs:
 
             ### 📥 Установка
 
-            1. Скачайте файл **`Dekorator.exe`** ниже
+            1. Скачайте файл **`Декоратор.exe`** ниже
             2. Запустите его двойным кликом — откроется браузер с приложением
             3. Оставьте окно программы открытым пока работаете
 
@@ -112,6 +112,6 @@ jobs:
             - Экспорт накладных в **PDF** и **Word (.docx)**
             - Полные реквизиты ООО «АКЦЕНТ» на накладных
             - Калькулятор материала и работ
-          files: "Dekorator.exe"
+          files: "Декоратор.exe"
           draft: false
           prerelease: false
