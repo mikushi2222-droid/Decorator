@@ -5,4 +5,4 @@ dist/
 *.local
 decorator-test
 tsconfig.tsbuildinfo
-*.exe
+# Декоратор.exe отслеживается в репозитории для скачивания
