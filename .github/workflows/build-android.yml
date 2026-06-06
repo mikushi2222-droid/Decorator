@@ -1,0 +1,115 @@
+name: Build Android APK
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g. v0.1.0)'
+        required: true
+        default: 'v0.1.0'
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    name: Build & Release APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      # Scaffold a complete Flutter Android project in a temp dir,
+      # then overlay our custom source files on top of it.
+      - name: Scaffold Flutter project
+        run: |
+          flutter create --org com.ooo_akcent --project-name decorator /tmp/decorator_scaffold
+          # Copy our source over the scaffold
+          cp -r mobile/lib            /tmp/decorator_scaffold/
+          cp -r mobile/assets         /tmp/decorator_scaffold/
+          cp    mobile/pubspec.yaml   /tmp/decorator_scaffold/
+          cp    mobile/analysis_options.yaml /tmp/decorator_scaffold/
+
+      - name: Set version
+        id: ver
+        run: |
+          TAG="${{ github.event.inputs.version || github.ref_name }}"
+          # strip leading 'v'
+          VERSION="${TAG#v}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=$TAG"         >> $GITHUB_OUTPUT
+
+      - name: Update pubspec version
+        run: |
+          cd /tmp/decorator_scaffold
+          sed -i "s/^version: .*/version: ${{ steps.ver.outputs.version }}+1/" pubspec.yaml
+
+      - name: Update Android package metadata
+        run: |
+          STRINGS=/tmp/decorator_scaffold/android/app/src/main/res/values/strings.xml
+          mkdir -p "$(dirname "$STRINGS")"
+          printf '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <string name="app_name">Декоратор</string>\n</resources>\n' > "$STRINGS"
+
+      - name: Install Flutter dependencies
+        run: |
+          cd /tmp/decorator_scaffold
+          flutter pub get
+
+      - name: Build release APK
+        run: |
+          cd /tmp/decorator_scaffold
+          flutter build apk --release --split-per-abi
+
+      - name: Rename APKs
+        run: |
+          VER="${{ steps.ver.outputs.version }}"
+          SRC="/tmp/decorator_scaffold/build/app/outputs/flutter-apk"
+          mkdir -p artifacts
+          # arm64-v8a is the primary target (most modern Android phones)
+          cp "$SRC/app-arm64-v8a-release.apk"  "artifacts/Decorator-${VER}-arm64.apk"
+          cp "$SRC/app-armeabi-v7a-release.apk" "artifacts/Decorator-${VER}-arm32.apk"
+          cp "$SRC/app-x86_64-release.apk"      "artifacts/Decorator-${VER}-x86_64.apk"
+
+      - name: Create or update Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: Декоратор ${{ steps.ver.outputs.version }}
+          body: |
+            ## Декоратор — приложение для малярных работ
+
+            ### Android APK
+            | Файл | Архитектура | Для кого |
+            |------|-------------|----------|
+            | `Decorator-*-arm64.apk` | arm64-v8a | Большинство современных телефонов ✅ |
+            | `Decorator-*-arm32.apk` | armeabi-v7a | Старые телефоны |
+            | `Decorator-*-x86_64.apk` | x86_64 | Эмуляторы / планшеты x86 |
+
+            **Установка:** Разрешите установку из неизвестных источников в настройках Android.
+
+            ### Windows (.exe)
+            Смотрите во вложениях ниже — файл `Декоратор.exe`.
+          files: |
+            artifacts/Decorator-${{ steps.ver.outputs.version }}-arm64.apk
+            artifacts/Decorator-${{ steps.ver.outputs.version }}-arm32.apk
+            artifacts/Decorator-${{ steps.ver.outputs.version }}-x86_64.apk
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
