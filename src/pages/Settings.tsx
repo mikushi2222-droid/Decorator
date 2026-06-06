@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/lib/db'
 import { formatCurrency } from '@/lib/utils'
@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog } from '@/components/ui/dialog'
-import { Settings as SettingsIcon, Plus, Trash2, Package, Hammer, Store, Check, Info, AlertTriangle, Landmark } from 'lucide-react'
+import { Settings as SettingsIcon, Plus, Trash2, Package, Hammer, Store, Check, Info, AlertTriangle, Landmark, Search, X } from 'lucide-react'
 import type { Product, LaborRate } from '@/types'
 
 function StoreSettingsSection() {
@@ -128,6 +128,8 @@ function ProductsSection() {
   const products = useLiveQuery(() => db.products.toArray(), [])
   const [showDialog, setShowDialog] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null)
+  const [search, setSearch] = useState('')
+  const [activeCategory, setActiveCategory] = useState<string>('Все')
   const [name, setName] = useState('')
   const [unit, setUnit] = useState('кг')
   const [price, setPrice] = useState('')
@@ -135,18 +137,31 @@ function ProductsSection() {
   const [category, setCategory] = useState('')
   const [saveError, setSaveError] = useState('')
 
+  const categories = useMemo(() => {
+    const cats = Array.from(new Set((products || []).map((p) => p.category).filter(Boolean))).sort()
+    return ['Все', ...cats]
+  }, [products])
+
+  const filtered = useMemo(() => {
+    const all = products || []
+    const q = search.trim().toLowerCase()
+    return all.filter((p) => {
+      const matchCat = activeCategory === 'Все' || p.category === activeCategory
+      const matchSearch = !q || p.name.toLowerCase().includes(q) || p.description?.toLowerCase().includes(q)
+      return matchCat && matchSearch
+    })
+  }, [products, search, activeCategory])
+
   const save = async () => {
     const parsedPrice = parseFloat(price)
-    const parsedCoverage = parseFloat(coverage)
     if (!name.trim()) { setSaveError('Укажите название товара'); return }
     if (!parsedPrice || parsedPrice <= 0) { setSaveError('Укажите цену — она должна быть больше нуля'); return }
-    if (!parsedCoverage || parsedCoverage <= 0) { setSaveError('Укажите расход (кг на м²) — должен быть больше нуля. Без него калькулятор не посчитает нужное количество.'); return }
     setSaveError('')
     try {
       await db.products.add({
         name: name.trim(), unit,
         price: parsedPrice,
-        coverage: parsedCoverage,
+        coverage: parseFloat(coverage) || 0,
         category,
         description: '',
       })
@@ -171,39 +186,90 @@ function ProductsSection() {
           <div className="flex items-center justify-between">
             <CardTitle className="text-base flex items-center gap-2">
               <Package className="h-4 w-4" /> Каталог товаров
+              {products && <span className="text-xs font-normal text-muted-foreground">({products.length} позиций)</span>}
             </CardTitle>
             <button onClick={() => setShowDialog(true)} className="flex items-center gap-1 text-sm text-primary hover:underline">
               <Plus className="h-3.5 w-3.5" /> Добавить
             </button>
           </div>
         </CardHeader>
-        <CardContent className="space-y-2">
-          <p className="text-xs text-muted-foreground">
-            Товары из каталога доступны в калькуляторе и при создании накладных.
-          </p>
-          {(products || []).length === 0 ? (
+        <CardContent className="space-y-3">
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Поиск по названию или описанию…"
+              className="w-full rounded-md border border-input bg-background pl-8 pr-8 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Category filter */}
+          <div className="flex flex-wrap gap-1.5">
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setActiveCategory(cat)}
+                className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                  activeCategory === cat
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+
+          {/* Results count */}
+          {search || activeCategory !== 'Все' ? (
+            <p className="text-xs text-muted-foreground">
+              {filtered.length === 0 ? 'Ничего не найдено' : `Найдено: ${filtered.length}`}
+            </p>
+          ) : null}
+
+          {/* Product list */}
+          {filtered.length === 0 && !search && activeCategory === 'Все' ? (
             <p className="text-sm text-muted-foreground text-center py-4">
               Товаров нет. Нажмите «Добавить» чтобы внести первый товар.
             </p>
+          ) : filtered.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">По вашему запросу ничего не найдено.</p>
           ) : (
-            (products || []).map((p) => (
-              <div key={p.id} className="flex items-center justify-between rounded-md border border-border px-3 py-2">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium truncate">{p.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatCurrency(p.price)}/{p.unit} · расход {p.coverage} {p.unit}/м²
-                    {p.category ? ` · ${p.category}` : ''}
-                  </p>
+            <div className="max-h-96 overflow-y-auto space-y-1 pr-0.5">
+              {filtered.map((p) => (
+                <div key={p.id} className="flex items-center justify-between rounded-md border border-border px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{p.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatCurrency(p.price)}/{p.unit}
+                      {p.coverage > 0 ? ` · расход ${p.coverage} ${p.unit}/м²` : ''}
+                      {p.category ? ` · ${p.category}` : ''}
+                    </p>
+                    {p.description && (
+                      <p className="text-xs text-muted-foreground/70 truncate">{p.description}</p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setDeleteTarget(p)}
+                    className="ml-2 text-muted-foreground hover:text-destructive shrink-0"
+                    title="Удалить товар"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
                 </div>
-                <button
-                  onClick={() => setDeleteTarget(p)}
-                  className="ml-2 text-muted-foreground hover:text-destructive shrink-0"
-                  title="Удалить товар"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
-            ))
+              ))}
+            </div>
           )}
         </CardContent>
       </Card>
@@ -217,7 +283,7 @@ function ProductsSection() {
             <Input label="Цена за ед., ₽" type="number" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0" />
           </div>
           <Input
-            label="Расход на 1 м²"
+            label="Расход на 1 м² (необязательно)"
             type="number"
             value={coverage}
             onChange={(e) => setCoverage(e.target.value)}

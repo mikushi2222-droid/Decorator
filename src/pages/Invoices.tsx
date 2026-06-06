@@ -26,6 +26,12 @@ const STATUS_VARIANTS: Record<string, 'outline' | 'warning' | 'success'> = {
   paid: 'success',
 }
 
+const STATUS_BORDER: Record<string, string> = {
+  draft: 'border-l-4 border-l-border',
+  sent: 'border-l-4 border-l-amber-400',
+  paid: 'border-l-4 border-l-green-500',
+}
+
 export function InvoicesPage() {
   const invoices = useLiveQuery(
     () => db.invoices.orderBy('createdAt').reverse().toArray(),
@@ -143,26 +149,25 @@ export function InvoicesPage() {
           {filtered.map((inv) => (
             <Card
               key={inv.id}
-              className="cursor-pointer hover:border-primary/40 transition-colors"
+              className={`cursor-pointer hover:shadow-md transition-all overflow-hidden ${STATUS_BORDER[inv.status]}`}
               onClick={() => { setSelected(inv); setView('detail') }}
             >
               <CardContent className="p-4">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span className="font-mono text-sm font-medium">{inv.number}</span>
+                    <div className="flex items-center gap-2 mb-1">
                       <Badge variant={STATUS_VARIANTS[inv.status]}>
                         {STATUS_LABELS[inv.status]}
                       </Badge>
+                      <span className="font-mono text-xs text-muted-foreground">{inv.number}</span>
                     </div>
-                    <p className="font-medium truncate">{inv.clientName || '—'}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {format(new Date(inv.date), 'd MMMM yyyy', { locale: ru })}
+                    <p className="font-semibold truncate text-base leading-tight">{inv.clientName || '—'}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {format(new Date(inv.date), 'd MMMM yyyy', { locale: ru })} · {inv.items.length} поз.
                     </p>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="font-bold text-primary">{formatCurrency(inv.total)}</p>
-                    <p className="text-xs text-muted-foreground">{inv.items.length} поз.</p>
+                    <p className="font-bold text-primary text-lg leading-tight">{formatCurrency(inv.total)}</p>
                   </div>
                 </div>
               </CardContent>

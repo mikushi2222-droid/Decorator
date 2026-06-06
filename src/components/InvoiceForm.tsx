@@ -1,14 +1,13 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/lib/db'
 import { formatCurrency } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { ArrowLeft, Plus, Trash2, Info } from 'lucide-react'
-import type { Invoice, InvoiceItem } from '@/types'
+import { ArrowLeft, Plus, Trash2, Info, Search } from 'lucide-react'
+import type { Invoice, InvoiceItem, Product } from '@/types'
 
 interface Props {
   onSave: (data: Omit<Invoice, 'id' | 'number' | 'createdAt'>) => Promise<void>
@@ -44,16 +43,38 @@ export function InvoiceForm({ onSave, onCancel }: Props) {
     setItems((prev) => prev.filter((_, i) => i !== idx))
   }
 
-  const addProduct = (productId: string) => {
-    const product = products?.find((p) => String(p.id) === productId)
-    if (!product) return
+  const [catalogSearch, setCatalogSearch] = useState('')
+  const [catalogOpen, setCatalogOpen] = useState(false)
+  const catalogRef = useRef<HTMLDivElement>(null)
+
+  const catalogFiltered = useMemo(() => {
+    const q = catalogSearch.trim().toLowerCase()
+    if (!q) return (products || []).slice(0, 30)
+    return (products || []).filter((p) =>
+      p.name.toLowerCase().includes(q) || p.description?.toLowerCase().includes(q) || p.category?.toLowerCase().includes(q)
+    ).slice(0, 50)
+  }, [products, catalogSearch])
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (catalogRef.current && !catalogRef.current.contains(e.target as Node)) {
+        setCatalogOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const addProduct = (product: Product) => {
     setItems((prev) => [...prev, {
       productId: product.id,
-      productName: product.name,
+      productName: `${product.name} (${product.unit})`,
       unit: product.unit,
       quantity: 1,
       price: product.price,
     }])
+    setCatalogSearch('')
+    setCatalogOpen(false)
   }
 
   const subtotal = items.reduce((s, item) => s + (item.quantity * item.price), 0)
@@ -94,11 +115,6 @@ export function InvoiceForm({ onSave, onCancel }: Props) {
       setSaving(false)
     }
   }
-
-  const catalogOptions = (products || []).map((p) => ({
-    value: String(p.id),
-    label: `${p.name} — ${formatCurrency(p.price)}/${p.unit}`,
-  }))
 
   return (
     <div className="mx-auto max-w-lg px-4 py-5 space-y-4">
@@ -164,17 +180,45 @@ export function InvoiceForm({ onSave, onCancel }: Props) {
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
-          {/* Quick add from catalog */}
-          {catalogOptions.length > 0 && (
+          {/* Quick add from catalog — searchable combobox */}
+          {(products || []).length > 0 && (
             <div className="space-y-1">
-              <Select
-                options={catalogOptions}
-                value=""
-                onChange={(e) => addProduct(e.target.value)}
-                placeholder="— Добавить из каталога —"
-              />
+              <div ref={catalogRef} className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                <input
+                  type="text"
+                  value={catalogSearch}
+                  onChange={(e) => { setCatalogSearch(e.target.value); setCatalogOpen(true) }}
+                  onFocus={() => setCatalogOpen(true)}
+                  placeholder="Поиск товара в каталоге…"
+                  className="w-full rounded-md border border-input bg-background pl-8 pr-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+                />
+                {catalogOpen && (
+                  <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-background shadow-lg max-h-64 overflow-y-auto">
+                    {catalogFiltered.length === 0 ? (
+                      <p className="px-3 py-2 text-sm text-muted-foreground">Ничего не найдено</p>
+                    ) : (
+                      catalogFiltered.map((p) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onMouseDown={(e) => { e.preventDefault(); addProduct(p) }}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground border-b border-border/50 last:border-0"
+                        >
+                          <span className="font-medium">{p.name}</span>
+                          <span className="text-muted-foreground ml-2 text-xs">
+                            {p.unit} · {formatCurrency(p.price)}
+                            {p.category ? ` · ${p.category}` : ''}
+                          </span>
+                          {p.description && <div className="text-xs text-muted-foreground/70 truncate">{p.description}</div>}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground">
-                Выберите из каталога — или заполните строки ниже вручную.
+                Найдите товар из каталога — или заполните строки ниже вручную.
               </p>
             </div>
           )}

@@ -42,10 +42,12 @@ export function CalculatorPage() {
 
   const { printRef, handlePrint } = usePrint()
 
-  const productOptions = (products || []).map((p) => ({
-    value: String(p.id),
-    label: `${p.name} (расход ${p.coverage} кг/м²)`,
-  }))
+  const productOptions = (products || [])
+    .filter((p) => p.coverage > 0)
+    .map((p) => ({
+      value: String(p.id),
+      label: `${p.name} — ${p.coverage} кг/м²`,
+    }))
 
   const modeOptions: { value: CalcMode; label: string }[] = [
     { value: 'both', label: 'Материал + работа (полная стоимость)' },
