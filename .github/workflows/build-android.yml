@@ -38,16 +38,21 @@ jobs:
       - name: Определить версию
         id: ver
         run: |
+          SHA=$(git rev-parse --short HEAD)
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             TAG="${{ github.event.inputs.version }}"
+            VERSION="${TAG#v}"
           elif [[ "$GITHUB_REF" == refs/tags/* ]]; then
             TAG="${GITHUB_REF#refs/tags/}"
+            VERSION="${TAG#v}"
           else
-            TAG="dev-$(git rev-parse --short HEAD)"
+            # dev-сборка с main: версия из pubspec, метка — короткий SHA
+            TAG="dev-$SHA"
+            VERSION=""
           fi
-          VERSION="${TAG#v}"
           echo "tag=$TAG"         >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "label=${VERSION:-dev-$SHA}" >> "$GITHUB_OUTPUT"
 
       - name: Scaffold Flutter-проекта
         run: |
@@ -59,7 +64,11 @@ jobs:
 
       - name: Версия в pubspec.yaml
         run: |
-          sed -i "s/^version:.*/version: ${{ steps.ver.outputs.version }}+1/" /tmp/app/pubspec.yaml
+          VER="${{ steps.ver.outputs.version }}"
+          # обновляем только для релизов с валидным semver; dev-сборки оставляем как есть
+          if [ -n "$VER" ]; then
+            sed -i "s/^version:.*/version: ${VER}+1/" /tmp/app/pubspec.yaml
+          fi
 
       - name: Русское имя приложения
         run: |
@@ -77,17 +86,17 @@ jobs:
 
       - name: Переименовать APK
         run: |
-          VER="${{ steps.ver.outputs.version }}"
+          LABEL="${{ steps.ver.outputs.label }}"
           SRC="/tmp/app/build/app/outputs/flutter-apk"
           mkdir -p dist
-          cp "$SRC/app-arm64-v8a-release.apk"  "dist/Decorator-${VER}-arm64.apk"
-          cp "$SRC/app-armeabi-v7a-release.apk" "dist/Decorator-${VER}-arm32.apk"
-          cp "$SRC/app-x86_64-release.apk"      "dist/Decorator-${VER}-x86_64.apk"
+          cp "$SRC/app-arm64-v8a-release.apk"  "dist/Decorator-${LABEL}-arm64.apk"
+          cp "$SRC/app-armeabi-v7a-release.apk" "dist/Decorator-${LABEL}-arm32.apk"
+          cp "$SRC/app-x86_64-release.apk"      "dist/Decorator-${LABEL}-x86_64.apk"
 
       - name: Загрузить артефакт (все запуски)
         uses: actions/upload-artifact@v4
         with:
-          name: apk-${{ steps.ver.outputs.version }}
+          name: apk-${{ steps.ver.outputs.label }}
           path: dist/
           retention-days: 30
 
@@ -111,9 +120,9 @@ jobs:
             ### Windows (.exe)
             Файл `Декоратор.exe` — в вложениях ниже.
           files: |
-            dist/Decorator-${{ steps.ver.outputs.version }}-arm64.apk
-            dist/Decorator-${{ steps.ver.outputs.version }}-arm32.apk
-            dist/Decorator-${{ steps.ver.outputs.version }}-x86_64.apk
+            dist/Decorator-${{ steps.ver.outputs.label }}-arm64.apk
+            dist/Decorator-${{ steps.ver.outputs.label }}-arm32.apk
+            dist/Decorator-${{ steps.ver.outputs.label }}-x86_64.apk
           draft: false
           prerelease: false
         env:
