@@ -78,34 +78,37 @@ export function InvoiceView({ invoice, onBack, onUpdateStatus, onDelete }: Props
           {/* ── Header ─────────────────────────────────────────────────── */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', paddingBottom: 14, borderBottom: `3px solid ${BRAND}`, marginBottom: 14 }}>
 
-            {/* Left: brand */}
-            <div>
-              <div style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontSize: 34, fontWeight: 700, color: BRAND, lineHeight: 1, letterSpacing: -1 }}>
-                Акцент
-              </div>
-              <div style={{ fontSize: 8.5, color: '#888', letterSpacing: 2.5, textTransform: 'uppercase', marginTop: 3 }}>
-                Художественная студия &amp; Салон декора
-              </div>
-              {settings && (
-                <div style={{ marginTop: 10, fontSize: 10, color: '#444', lineHeight: 1.7 }}>
-                  <div style={{ fontWeight: 600 }}>{settings.name}</div>
-                  <div>
-                    {settings.inn && `ИНН: ${settings.inn}`}
-                    {settings.kpp && ` · КПП: ${settings.kpp}`}
-                    {settings.ogrn && ` · ОГРН: ${settings.ogrn}`}
+            {/* Left: logo + org details */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+              {/* Logo image */}
+              <img
+                src="/logo-akcent.jpg"
+                alt="Акцент"
+                style={{ width: 90, height: 90, borderRadius: 10, objectFit: 'cover', flexShrink: 0, border: `2px solid ${BRAND}` }}
+              />
+              {/* Org details */}
+              <div style={{ paddingTop: 4 }}>
+                {settings && (
+                  <div style={{ fontSize: 10.5, color: '#333', lineHeight: 1.8 }}>
+                    <div style={{ fontWeight: 700, fontSize: 12, color: BRAND }}>{settings.name}</div>
+                    <div>
+                      {settings.inn && `ИНН: ${settings.inn}`}
+                      {settings.kpp && ` · КПП: ${settings.kpp}`}
+                    </div>
+                    {settings.ogrn && <div>ОГРН: {settings.ogrn}</div>}
+                    {settings.address && <div>{settings.address}</div>}
+                    {settings.phone && <div>Тел: {settings.phone}</div>}
                   </div>
-                  {settings.address && <div>{settings.address}</div>}
-                  {settings.phone && <div>Тел: {settings.phone}</div>}
-                </div>
-              )}
+                )}
+              </div>
             </div>
 
             {/* Right: invoice title */}
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: BRAND, textTransform: 'uppercase', letterSpacing: 1 }}>
+            <div style={{ textAlign: 'right', paddingTop: 4 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: BRAND, textTransform: 'uppercase', letterSpacing: 1.5 }}>
                 Расходная накладная
               </div>
-              <div style={{ fontSize: 24, fontWeight: 800, color: BRAND, marginTop: 2 }}>
+              <div style={{ fontSize: 26, fontWeight: 800, color: BRAND, marginTop: 2, letterSpacing: -0.5 }}>
                 № {invoice.number}
               </div>
               <div style={{ fontSize: 11, color: '#666', marginTop: 3 }}>
