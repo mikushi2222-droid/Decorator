@@ -41,7 +41,7 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
     setState(() {
       _items.add(_ItemEntry(
         productId: p.id,
-        nameC: TextEditingController(text: '${p.name} (${p.unit})'),
+        nameC: TextEditingController(text: p.name),
         unitC: TextEditingController(text: p.unit),
         qtyC:  TextEditingController(text: '1'),
         priceC: TextEditingController(text: p.price.toStringAsFixed(2)),

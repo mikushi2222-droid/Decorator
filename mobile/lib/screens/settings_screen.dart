@@ -203,55 +203,64 @@ class _ProductsTabState extends State<_ProductsTab> {
     setState(() { _products = res; _total = all.length; _loading = false; });
   }
 
-  void _showAddDialog() {
+  Future<void> _showAddDialog() async {
     final nameC = TextEditingController();
     final unitC = TextEditingController(text: 'кг');
     final priceC = TextEditingController();
     final coverageC = TextEditingController();
     final catC = TextEditingController();
 
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Добавить товар'),
-        content: SingleChildScrollView(
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            TextField(controller: nameC, decoration: const InputDecoration(labelText: 'Название *')),
-            const SizedBox(height: 8),
-            Row(children: [
-              Expanded(child: TextField(controller: unitC, decoration: const InputDecoration(labelText: 'Ед.'))),
-              const SizedBox(width: 8),
-              Expanded(child: TextField(controller: priceC, keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Цена, ₽ *'))),
+    try {
+      await showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('Добавить товар'),
+          content: SingleChildScrollView(
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              TextField(controller: nameC, decoration: const InputDecoration(labelText: 'Название *')),
+              const SizedBox(height: 8),
+              Row(children: [
+                Expanded(child: TextField(controller: unitC, decoration: const InputDecoration(labelText: 'Ед.'))),
+                const SizedBox(width: 8),
+                Expanded(child: TextField(controller: priceC, keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Цена, ₽ *'))),
+              ]),
+              const SizedBox(height: 8),
+              TextField(controller: coverageC, keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Расход кг/м² (для калькулятора)')),
+              const SizedBox(height: 8),
+              TextField(controller: catC, decoration: const InputDecoration(labelText: 'Категория')),
             ]),
-            const SizedBox(height: 8),
-            TextField(controller: coverageC, keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Расход кг/м² (для калькулятора)')),
-            const SizedBox(height: 8),
-            TextField(controller: catC, decoration: const InputDecoration(labelText: 'Категория')),
-          ]),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Отмена')),
-          TextButton(
-            onPressed: () async {
-              if (nameC.text.trim().isEmpty || priceC.text.isEmpty) return;
-              await AppDatabase.instance.insertProduct(Product(
-                name: nameC.text.trim(),
-                unit: unitC.text.trim(),
-                price: double.tryParse(priceC.text) ?? 0,
-                coverage: double.tryParse(coverageC.text) ?? 0,
-                category: catC.text.trim(),
-                description: '',
-              ));
-              if (context.mounted) Navigator.pop(context);
-              _search();
-            },
-            child: const Text('Добавить'),
           ),
-        ],
-      ),
-    );
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Отмена')),
+            TextButton(
+              onPressed: () async {
+                if (nameC.text.trim().isEmpty || priceC.text.isEmpty) return;
+                await AppDatabase.instance.insertProduct(Product(
+                  name: nameC.text.trim(),
+                  unit: unitC.text.trim(),
+                  price: double.tryParse(priceC.text) ?? 0,
+                  coverage: double.tryParse(coverageC.text) ?? 0,
+                  category: catC.text.trim(),
+                  description: '',
+                ));
+                if (context.mounted) Navigator.pop(context);
+              },
+              child: const Text('Добавить'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      nameC.dispose();
+      unitC.dispose();
+      priceC.dispose();
+      coverageC.dispose();
+      catC.dispose();
+    }
+    _loadCategories();
+    _search();
   }
 
   @override
@@ -382,42 +391,48 @@ class _LaborTabState extends State<_LaborTab> {
     setState(() => _rates = rates);
   }
 
-  void _showAddDialog() {
+  Future<void> _showAddDialog() async {
     final nameC = TextEditingController();
     final priceC = TextEditingController();
     final unitC = TextEditingController(text: 'м²');
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Добавить вид работ'),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
-          TextField(controller: nameC, decoration: const InputDecoration(labelText: 'Название *')),
-          const SizedBox(height: 8),
-          Row(children: [
-            Expanded(child: TextField(controller: priceC, keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Ставка, ₽ *'))),
-            const SizedBox(width: 8),
-            Expanded(child: TextField(controller: unitC, decoration: const InputDecoration(labelText: 'Ед.'))),
+    try {
+      await showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('Добавить вид работ'),
+          content: Column(mainAxisSize: MainAxisSize.min, children: [
+            TextField(controller: nameC, decoration: const InputDecoration(labelText: 'Название *')),
+            const SizedBox(height: 8),
+            Row(children: [
+              Expanded(child: TextField(controller: priceC, keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Ставка, ₽ *'))),
+              const SizedBox(width: 8),
+              Expanded(child: TextField(controller: unitC, decoration: const InputDecoration(labelText: 'Ед.'))),
+            ]),
           ]),
-        ]),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Отмена')),
-          TextButton(
-            onPressed: () async {
-              if (nameC.text.trim().isEmpty || priceC.text.isEmpty) return;
-              await AppDatabase.instance.insertLaborRate(LaborRate(
-                name: nameC.text.trim(),
-                pricePerSqm: double.tryParse(priceC.text) ?? 0,
-                unit: unitC.text.trim(),
-              ));
-              if (context.mounted) Navigator.pop(context);
-              _load();
-            },
-            child: const Text('Добавить'),
-          ),
-        ],
-      ),
-    );
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Отмена')),
+            TextButton(
+              onPressed: () async {
+                if (nameC.text.trim().isEmpty || priceC.text.isEmpty) return;
+                await AppDatabase.instance.insertLaborRate(LaborRate(
+                  name: nameC.text.trim(),
+                  pricePerSqm: double.tryParse(priceC.text) ?? 0,
+                  unit: unitC.text.trim(),
+                ));
+                if (context.mounted) Navigator.pop(context);
+              },
+              child: const Text('Добавить'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      nameC.dispose();
+      priceC.dispose();
+      unitC.dispose();
+    }
+    _load();
   }
 
   @override
@@ -457,7 +472,22 @@ class _LaborTabState extends State<_LaborTab> {
                       trailing: IconButton(
                         icon: const Icon(Icons.delete_outline, size: 18, color: Colors.redAccent),
                         onPressed: () async {
-                          if (r.id != null) {
+                          if (r.id == null) return;
+                          final ok = await showDialog<bool>(
+                            context: context,
+                            builder: (_) => AlertDialog(
+                              title: const Text('Удалить ставку?'),
+                              content: Text(r.name),
+                              actions: [
+                                TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Отмена')),
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context, true),
+                                  child: const Text('Удалить', style: TextStyle(color: Colors.red)),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (ok == true) {
                             await AppDatabase.instance.deleteLaborRate(r.id!);
                             _load();
                           }

@@ -184,9 +184,12 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
               _laborRates.map((r) {
                 final sel = _selectedRates.contains(r.id);
                 return InkWell(
-                  onTap: () => setState(() {
-                    if (sel) _selectedRates.remove(r.id); else _selectedRates.add(r.id!);
-                  }),
+                  onTap: () {
+                    if (r.id == null) return;
+                    setState(() {
+                      if (sel) _selectedRates.remove(r.id); else _selectedRates.add(r.id!);
+                    });
+                  },
                   borderRadius: BorderRadius.circular(8),
                   child: Container(
                     margin: const EdgeInsets.only(bottom: 6),

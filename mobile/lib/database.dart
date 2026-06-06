@@ -240,7 +240,10 @@ class AppDatabase {
 
   Future<int> getLastInvoiceSeq() async {
     final db = await database;
-    final rows = await db.rawQuery('SELECT number FROM invoices ORDER BY created_at DESC LIMIT 1');
+    final year = DateTime.now().year;
+    final rows = await db.rawQuery(
+      "SELECT number FROM invoices WHERE number LIKE 'АКЦ-$year-%' ORDER BY created_at DESC LIMIT 1",
+    );
     if (rows.isEmpty) return 0;
     final num = rows.first['number'] as String;
     final parts = num.split('-');

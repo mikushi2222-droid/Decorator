@@ -32,7 +32,6 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.0'
           channel: 'stable'
           cache: true
 
@@ -63,14 +62,9 @@ jobs:
 
       - name: Update Android package metadata
         run: |
-          # Set app label in strings.xml
-          mkdir -p /tmp/decorator_scaffold/android/app/src/main/res/values
-          cat > /tmp/decorator_scaffold/android/app/src/main/res/values/strings.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <resources>
-              <string name="app_name">Декоратор</string>
-          </resources>
-          EOF
+          STRINGS=/tmp/decorator_scaffold/android/app/src/main/res/values/strings.xml
+          mkdir -p "$(dirname "$STRINGS")"
+          printf '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <string name="app_name">Декоратор</string>\n</resources>\n' > "$STRINGS"
 
       - name: Install Flutter dependencies
         run: |
