@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../database.dart';
 import '../models.dart';
 import '../utils.dart';
+import 'onboarding_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -153,6 +154,23 @@ class _StoreSettingsTabState extends State<_StoreSettingsTab> {
           onPressed: _save,
           icon: Icon(_saved ? Icons.check : Icons.save),
           label: Text(_saved ? 'Сохранено!' : 'Сохранить реквизиты'),
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const OnboardingScreen(),
+              fullscreenDialog: true,
+            ),
+          ),
+          icon: const Icon(Icons.school_outlined, size: 18),
+          label: const Text('Посмотреть обучение'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: const Color(0xFF1E3A4A),
+            side: const BorderSide(color: Color(0xFF1E3A4A)),
+            padding: const EdgeInsets.symmetric(vertical: 14),
+          ),
         ),
         const SizedBox(height: 24),
       ]),
