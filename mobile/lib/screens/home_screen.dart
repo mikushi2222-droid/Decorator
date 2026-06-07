@@ -59,9 +59,9 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       backgroundColor: Colors.transparent,
       builder: (_) => _MoreSheet(
-        onNavigate: (screen) {
+        onNavigate: (builder) {
           Navigator.pop(context);
-          Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
+          Navigator.push(context, MaterialPageRoute(builder: builder));
         },
       ),
     );
@@ -239,18 +239,29 @@ class _WideNavRail extends StatelessWidget {
 // ─── "Ещё" bottom sheet ───────────────────────────────────────────────────────
 
 class _MoreSheet extends StatelessWidget {
-  final void Function(Widget screen) onNavigate;
+  final void Function(WidgetBuilder builder) onNavigate;
   const _MoreSheet({required this.onNavigate});
 
   @override
   Widget build(BuildContext context) {
     final items = [
       _MoreItem(Icons.calculate_outlined, 'Калькулятор расхода',
-          'Материалы и работы', const Color(0xFF4A8A6E), const CalculatorScreen()),
+          'Материалы и работы', kBronze,
+          (_) => const CalculatorScreen()),
       _MoreItem(Icons.palette_outlined, 'Галерея фактур',
-          'Шёлк, Травертин, Барельеф', const Color(0xFFC47B2B), const SamplesScreen()),
+          'Шёлк, Травертин, Барельеф', kGold,
+          (_) => Scaffold(
+            backgroundColor: kBackground,
+            appBar: AppBar(title: const Text('Галерея фактур')),
+            body: const SamplesScreen(),
+          )),
       _MoreItem(Icons.settings_outlined, 'Настройки',
-          'Профиль, реквизиты, каталог', const Color(0xFF9E9585), const SettingsScreen()),
+          'Профиль, реквизиты, каталог', const Color(0xFF9E9585),
+          (_) => Scaffold(
+            backgroundColor: kBackground,
+            appBar: AppBar(title: const Text('Настройки')),
+            body: const SettingsScreen(),
+          )),
     ];
 
     return Container(
@@ -279,7 +290,7 @@ class _MoreSheet extends StatelessWidget {
           ),
         ]),
         const SizedBox(height: 8),
-        ...items.map((item) => _MoreTile(item: item, onTap: () => onNavigate(item.screen))),
+        ...items.map((item) => _MoreTile(item: item, onTap: () => onNavigate(item.screenBuilder))),
         const SizedBox(height: 8),
         SafeArea(child: const SizedBox()),
       ]),
@@ -292,8 +303,8 @@ class _MoreItem {
   final String title;
   final String subtitle;
   final Color color;
-  final Widget screen;
-  const _MoreItem(this.icon, this.title, this.subtitle, this.color, this.screen);
+  final WidgetBuilder screenBuilder;
+  _MoreItem(this.icon, this.title, this.subtitle, this.color, this.screenBuilder);
 }
 
 class _MoreTile extends StatelessWidget {

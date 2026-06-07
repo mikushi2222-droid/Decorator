@@ -24,9 +24,9 @@ extension TextureGroupX on TextureGroup {
 
   Color get color {
     switch (this) {
-      case TextureGroup.liquid:  return const Color(0xFF7C5CBF);
-      case TextureGroup.mineral: return const Color(0xFF4A8A6E);
-      case TextureGroup.volume:  return const Color(0xFFC47B2B);
+      case TextureGroup.liquid:  return kBronze;
+      case TextureGroup.mineral: return const Color(0xFF5A7D68);
+      case TextureGroup.volume:  return kGold;
     }
   }
 }
@@ -420,12 +420,12 @@ class _SamplesScreenState extends State<SamplesScreen> {
           child: Row(children: [
             const Expanded(
               child: Text('Примеры покрытий',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: kGraphite)),
             ),
             IconButton(
               tooltip: _sortMode ? 'Готово' : 'Сортировать',
               icon: Icon(_sortMode ? Icons.check_circle_outline : Icons.swap_vert,
-                  color: _sortMode ? Colors.green : null),
+                  color: _sortMode ? const Color(0xFF5A7D68) : null),
               onPressed: () => setState(() => _sortMode = !_sortMode),
             ),
             TextButton.icon(
@@ -551,7 +551,7 @@ class _SamplesScreenState extends State<SamplesScreen> {
                 ),
               ),
               title: Text(s.name,
-                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: kGraphite)),
               subtitle: Text(s.effect,
                   style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
               trailing: const Icon(Icons.drag_handle, color: Colors.grey),
@@ -640,7 +640,7 @@ class _SampleCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(sample.name,
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: kGraphite),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis),
                       const SizedBox(height: 2),
@@ -692,9 +692,9 @@ class _SampleCard extends StatelessWidget {
       );
 
   Color _diffColor(int d) {
-    if (d <= 2) return Colors.green.shade600;
-    if (d == 3) return Colors.orange.shade700;
-    return Colors.red.shade600;
+    if (d <= 2) return const Color(0xFF5A7D68);
+    if (d == 3) return kGold;
+    return kBronze;
   }
 }
 

@@ -140,7 +140,10 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
+    return Scaffold(
+      backgroundColor: kBackground,
+      appBar: AppBar(title: const Text('Калькулятор расхода')),
+      body: SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -309,6 +312,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
           const SizedBox(height: 24),
         ],
       ),
+      ),
     );
   }
 
@@ -321,7 +325,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
         child: Row(children: [
           const Icon(Icons.info_outline, size: 16, color: kBronze),
           const SizedBox(width: 8),
-          Expanded(child: Text(text, style: const TextStyle(fontSize: 13, color: kBronze))),
+          Expanded(child: Text(text, style: const TextStyle(fontSize: 13, color: kGraphite, decoration: TextDecoration.none))),
         ]),
       );
 
