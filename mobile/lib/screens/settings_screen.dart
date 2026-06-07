@@ -1,4 +1,7 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
 import '../database.dart';
 import '../models.dart';
 import '../utils.dart';
@@ -231,20 +234,22 @@ class _ProductsTabState extends State<_ProductsTab> {
     setState(() { _products = res; _loading = false; });
   }
 
-  Future<void> _showAddDialog() async {
-    final nameC = TextEditingController();
-    final unitC = TextEditingController(text: 'кг');
-    final priceC = TextEditingController();
-    final coverageC = TextEditingController();
-    final packSizeC = TextEditingController();
-    final catC = TextEditingController();
+  Future<void> _showProductDialog([Product? existing]) async {
+    final isEdit = existing != null;
+    final nameC     = TextEditingController(text: existing?.name ?? '');
+    final unitC     = TextEditingController(text: existing?.unit ?? 'кг');
+    final priceC    = TextEditingController(text: existing != null ? existing.price.toStringAsFixed(2) : '');
+    final coverageC = TextEditingController(text: existing != null && existing.coverage > 0 ? existing.coverage.toString() : '');
+    final packSizeC = TextEditingController(text: existing != null && existing.packSize > 0 ? existing.packSize.toString() : '');
+    final catC      = TextEditingController(text: existing?.category ?? '');
+    final descC     = TextEditingController(text: existing?.description ?? '');
 
-    bool inserted = false;
+    bool changed = false;
     try {
-      inserted = await showDialog<bool>(
+      changed = await showDialog<bool>(
         context: context,
         builder: (_) => AlertDialog(
-          title: const Text('Добавить товар'),
+          title: Text(isEdit ? 'Редактировать товар' : 'Добавить товар'),
           content: SingleChildScrollView(
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               TextField(controller: nameC, decoration: const InputDecoration(labelText: 'Название *')),
@@ -265,6 +270,8 @@ class _ProductsTabState extends State<_ProductsTab> {
               ]),
               const SizedBox(height: 8),
               TextField(controller: catC, decoration: const InputDecoration(labelText: 'Категория')),
+              const SizedBox(height: 8),
+              TextField(controller: descC, decoration: const InputDecoration(labelText: 'Описание')),
             ]),
           ),
           actions: [
@@ -272,34 +279,116 @@ class _ProductsTabState extends State<_ProductsTab> {
             TextButton(
               onPressed: () async {
                 if (nameC.text.trim().isEmpty || priceC.text.isEmpty) return;
-                await AppDatabase.instance.insertProduct(Product(
-                  name: nameC.text.trim(),
-                  unit: unitC.text.trim(),
-                  price: double.tryParse(priceC.text) ?? 0,
-                  coverage: double.tryParse(coverageC.text) ?? 0,
-                  packSize: double.tryParse(packSizeC.text) ?? 0,
-                  category: catC.text.trim(),
-                  description: '',
-                ));
+                final product = Product(
+                  id:          existing?.id,
+                  name:        nameC.text.trim(),
+                  unit:        unitC.text.trim(),
+                  price:       double.tryParse(priceC.text) ?? 0,
+                  coverage:    double.tryParse(coverageC.text) ?? 0,
+                  packSize:    double.tryParse(packSizeC.text) ?? 0,
+                  category:    catC.text.trim(),
+                  description: descC.text.trim(),
+                );
+                if (isEdit) {
+                  await AppDatabase.instance.updateProduct(product);
+                } else {
+                  await AppDatabase.instance.insertProduct(product);
+                }
                 if (context.mounted) Navigator.pop(context, true);
               },
-              child: const Text('Добавить'),
+              child: Text(isEdit ? 'Сохранить' : 'Добавить'),
             ),
           ],
         ),
       ) == true;
     } finally {
-      nameC.dispose();
-      unitC.dispose();
-      priceC.dispose();
-      coverageC.dispose();
-      packSizeC.dispose();
-      catC.dispose();
+      nameC.dispose(); unitC.dispose(); priceC.dispose();
+      coverageC.dispose(); packSizeC.dispose(); catC.dispose(); descC.dispose();
     }
-    if (inserted) {
-      _loadCategories();
-      _search();
+    if (changed) { _loadCategories(); _search(); }
+  }
+
+  Future<void> _exportCsv() async {
+    final all = await AppDatabase.instance.getProducts();
+    final csv = productsAsCsv(all);
+    try {
+      final dir  = await getApplicationDocumentsDirectory();
+      final file = File('${dir.path}/products_export.csv');
+      await file.writeAsString(csv);
+      if (!mounted) return;
+      await Clipboard.setData(ClipboardData(text: file.path));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Файл сохранён:\n${file.path}\n(путь скопирован в буфер)'),
+        duration: const Duration(seconds: 5),
+      ));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Ошибка экспорта: $e'),
+        backgroundColor: Colors.red,
+      ));
     }
+  }
+
+  Future<void> _showImportDialog() async {
+    final controller = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Импорт CSV'),
+        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Формат: name,unit,price,coverage,pack_size,category,description',
+              style: TextStyle(fontSize: 11, color: Colors.grey)),
+          const SizedBox(height: 8),
+          TextField(
+            controller: controller,
+            maxLines: 8,
+            decoration: const InputDecoration(
+              hintText: 'Вставьте содержимое CSV-файла…',
+              border: OutlineInputBorder(),
+            ),
+          ),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Отмена')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Импортировать'),
+          ),
+        ],
+      ),
+    );
+
+    if (ok != true || !mounted) { controller.dispose(); return; }
+    final rows = parseCsvProducts(controller.text);
+    controller.dispose();
+
+    if (rows.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Нет данных для импорта'), backgroundColor: Colors.orange));
+      return;
+    }
+
+    final db = AppDatabase.instance;
+    int count = 0;
+    for (final r in rows) {
+      if ((r['name'] as String).isEmpty) continue;
+      await db.insertProduct(Product(
+        name:        r['name'] as String,
+        unit:        r['unit'] as String,
+        price:       (r['price'] as num).toDouble(),
+        coverage:    (r['coverage'] as num).toDouble(),
+        packSize:    (r['pack_size'] as num).toDouble(),
+        category:    r['category'] as String,
+        description: r['description'] as String,
+      ));
+      count++;
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Импортировано $count товаров')));
+    _loadCategories();
+    _search();
   }
 
   @override
@@ -326,9 +415,26 @@ class _ProductsTabState extends State<_ProductsTab> {
             ),
             const SizedBox(width: 8),
             IconButton.filled(
-              onPressed: _showAddDialog,
+              onPressed: () => _showProductDialog(),
               icon: const Icon(Icons.add),
+              tooltip: 'Добавить товар',
               style: IconButton.styleFrom(backgroundColor: const Color(0xFF1E3A4A), foregroundColor: Colors.white),
+            ),
+            const SizedBox(width: 4),
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert),
+              onSelected: (v) {
+                if (v == 'export') _exportCsv();
+                if (v == 'import') _showImportDialog();
+              },
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: 'export', child: Row(children: [
+                  Icon(Icons.download_outlined, size: 18), SizedBox(width: 8), Text('Экспорт CSV'),
+                ])),
+                PopupMenuItem(value: 'import', child: Row(children: [
+                  Icon(Icons.upload_outlined, size: 18), SizedBox(width: 8), Text('Импорт CSV'),
+                ])),
+              ],
             ),
           ]),
         ),
@@ -371,27 +477,41 @@ class _ProductsTabState extends State<_ProductsTab> {
                         '${formatCurrency(p.price)} / ${p.unit}${p.category.isNotEmpty ? " · ${p.category}" : ""}',
                         style: const TextStyle(fontSize: 11),
                       ),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.delete_outline, size: 18, color: Colors.redAccent),
-                        onPressed: () async {
-                          final ok = await showDialog<bool>(
-                            context: context,
-                            builder: (_) => AlertDialog(
-                              title: const Text('Удалить товар?'),
-                              content: Text(p.name),
-                              actions: [
-                                TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Отмена')),
-                                TextButton(onPressed: () => Navigator.pop(context, true),
-                                    child: const Text('Удалить', style: TextStyle(color: Colors.red))),
-                              ],
-                            ),
-                          );
-                          if (ok == true && p.id != null) {
-                            await AppDatabase.instance.deleteProduct(p.id!);
-                            _loadCategories();
-                            _search();
-                          }
-                        },
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF1E3A4A)),
+                            onPressed: () => _showProductDialog(p),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                          ),
+                          const SizedBox(width: 4),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline, size: 18, color: Colors.redAccent),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            onPressed: () async {
+                              final ok = await showDialog<bool>(
+                                context: context,
+                                builder: (_) => AlertDialog(
+                                  title: const Text('Удалить товар?'),
+                                  content: Text(p.name),
+                                  actions: [
+                                    TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Отмена')),
+                                    TextButton(onPressed: () => Navigator.pop(context, true),
+                                        child: const Text('Удалить', style: TextStyle(color: Colors.red))),
+                                  ],
+                                ),
+                              );
+                              if (ok == true && p.id != null) {
+                                await AppDatabase.instance.deleteProduct(p.id!);
+                                _loadCategories();
+                                _search();
+                              }
+                            },
+                          ),
+                        ],
                       ),
                     );
                   },

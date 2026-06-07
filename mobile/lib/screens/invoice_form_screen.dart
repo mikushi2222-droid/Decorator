@@ -19,7 +19,12 @@ class InvoicePresetItem {
 
 class InvoiceFormScreen extends StatefulWidget {
   final List<InvoicePresetItem> presetItems;
-  const InvoiceFormScreen({super.key, this.presetItems = const []});
+  final Invoice? existingInvoice; // null = новая, non-null = редактирование
+  const InvoiceFormScreen({
+    super.key,
+    this.presetItems = const [],
+    this.existingInvoice,
+  });
 
   @override
   State<InvoiceFormScreen> createState() => _InvoiceFormScreenState();
@@ -36,14 +41,38 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
   late List<_ItemEntry> _items;
   bool _saving = false;
 
+  // Поиск по каталогу
   final _productSearchC = TextEditingController();
   List<Product> _productSuggestions = [];
-  Object? _searchToken;
+  Object? _productSearchToken;
+
+  // Автодополнение клиентов
+  List<Client> _clientSuggestions = [];
+  Object? _clientSearchToken;
+
+  bool get _isEdit => widget.existingInvoice != null;
 
   @override
   void initState() {
     super.initState();
-    if (widget.presetItems.isNotEmpty) {
+    final inv = widget.existingInvoice;
+    if (inv != null) {
+      // Режим редактирования
+      _clientNameC.text    = inv.clientName;
+      _clientPhoneC.text   = inv.clientPhone;
+      _clientAddressC.text = inv.clientAddress;
+      _date                = inv.date;
+      if (inv.discount > 0) _discountC.text = _fmtQty(inv.discount);
+      _notesC.text = inv.notes;
+      _items = inv.items.map((item) => _ItemEntry(
+        productId: item.productId,
+        nameC:  TextEditingController(text: item.productName),
+        unitC:  TextEditingController(text: item.unit),
+        qtyC:   TextEditingController(text: _fmtQty(item.quantity)),
+        priceC: TextEditingController(text: item.price.toStringAsFixed(2)),
+      )).toList();
+      if (_items.isEmpty) _items = [_ItemEntry()];
+    } else if (widget.presetItems.isNotEmpty) {
       _items = widget.presetItems.map((p) => _ItemEntry(
         nameC:  TextEditingController(text: p.name),
         unitC:  TextEditingController(text: p.unit),
@@ -58,12 +87,14 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
   String _fmtQty(double v) =>
       v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(2);
 
+  // ── Поиск товаров ──────────────────────────────────────────────────────────
+
   void _searchProducts(String q) async {
     if (q.isEmpty) { setState(() => _productSuggestions = []); return; }
     final token = Object();
-    _searchToken = token;
+    _productSearchToken = token;
     final res = await AppDatabase.instance.searchProducts(q);
-    if (!mounted || _searchToken != token) return;
+    if (!mounted || _productSearchToken != token) return;
     setState(() => _productSuggestions = res.take(30).toList());
   }
 
@@ -71,9 +102,9 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
     setState(() {
       _items.add(_ItemEntry(
         productId: p.id,
-        nameC: TextEditingController(text: p.name),
-        unitC: TextEditingController(text: p.unit),
-        qtyC:  TextEditingController(text: '1'),
+        nameC:  TextEditingController(text: p.name),
+        unitC:  TextEditingController(text: p.unit),
+        qtyC:   TextEditingController(text: '1'),
         priceC: TextEditingController(text: p.price.toStringAsFixed(2)),
       ));
       _productSuggestions = [];
@@ -81,10 +112,34 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
     });
   }
 
+  // ── Автодополнение клиентов ────────────────────────────────────────────────
+
+  void _searchClients(String q) async {
+    if (q.isEmpty) { setState(() => _clientSuggestions = []); return; }
+    final token = Object();
+    _clientSearchToken = token;
+    final res = await AppDatabase.instance.searchClients(q);
+    if (!mounted || _clientSearchToken != token) return;
+    setState(() => _clientSuggestions = res);
+  }
+
+  void _selectClient(Client c) {
+    setState(() {
+      _clientNameC.text    = c.name;
+      _clientPhoneC.text   = c.phone;
+      _clientAddressC.text = c.address;
+      _clientSuggestions   = [];
+    });
+  }
+
+  // ── Вычисления ─────────────────────────────────────────────────────────────
+
   double get _subtotal =>
       _items.fold(0, (s, i) => s + (double.tryParse(i.qtyC.text) ?? 0) * (double.tryParse(i.priceC.text) ?? 0));
   double get _discountAmt => double.tryParse(_discountC.text) ?? 0;
   double get _total => (_subtotal - _discountAmt).clamp(0, double.infinity);
+
+  // ── Сохранение ─────────────────────────────────────────────────────────────
 
   Future<void> _save() async {
     if (_clientNameC.text.trim().isEmpty) {
@@ -98,34 +153,59 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
     setState(() => _saving = true);
     try {
       final db = AppDatabase.instance;
-      final seq = await db.getLastInvoiceSeq();
-      final number = generateInvoiceNumber(seq);
-      final invoice = Invoice(
-        number: number,
-        date: _date,
-        clientName: _clientNameC.text.trim(),
-        clientPhone: _clientPhoneC.text.trim(),
-        clientAddress: _clientAddressC.text.trim(),
-        items: _items.map((i) => InvoiceItem(
-          productId: i.productId,
-          productName: i.nameC.text.trim(),
-          unit: i.unitC.text.trim().isEmpty ? 'шт.' : i.unitC.text.trim(),
-          quantity: double.tryParse(i.qtyC.text) ?? 1,
-          price: double.tryParse(i.priceC.text) ?? 0,
-        )).toList(),
-        subtotal: _subtotal,
-        discount: _discountAmt,
-        total: _total,
-        status: InvoiceStatus.draft,
-        notes: _notesC.text.trim(),
-        createdAt: DateTime.now(),
-      );
-      await db.insertInvoice(invoice);
+      final invoiceItems = _items.map((i) => InvoiceItem(
+        productId:   i.productId,
+        productName: i.nameC.text.trim(),
+        unit:        i.unitC.text.trim().isEmpty ? 'шт.' : i.unitC.text.trim(),
+        quantity:    double.tryParse(i.qtyC.text) ?? 1,
+        price:       double.tryParse(i.priceC.text) ?? 0,
+      )).toList();
+
+      if (_isEdit) {
+        final updated = widget.existingInvoice!.copyWith(
+          date:          _date,
+          clientName:    _clientNameC.text.trim(),
+          clientPhone:   _clientPhoneC.text.trim(),
+          clientAddress: _clientAddressC.text.trim(),
+          items:         invoiceItems,
+          subtotal:      _subtotal,
+          discount:      _discountAmt,
+          total:         _total,
+          notes:         _notesC.text.trim(),
+        );
+        await db.updateInvoice(updated);
+      } else {
+        final seq    = await db.getLastInvoiceSeq();
+        final number = generateInvoiceNumber(seq);
+        final invoice = Invoice(
+          number:        number,
+          date:          _date,
+          clientName:    _clientNameC.text.trim(),
+          clientPhone:   _clientPhoneC.text.trim(),
+          clientAddress: _clientAddressC.text.trim(),
+          items:         invoiceItems,
+          subtotal:      _subtotal,
+          discount:      _discountAmt,
+          total:         _total,
+          status:        InvoiceStatus.draft,
+          notes:         _notesC.text.trim(),
+          createdAt:     DateTime.now(),
+        );
+        await db.insertInvoice(invoice);
+      }
+
+      // Автосохранение клиента в базу
+      await db.upsertClient(Client(
+        name:    _clientNameC.text.trim(),
+        phone:   _clientPhoneC.text.trim(),
+        address: _clientAddressC.text.trim(),
+      ));
+
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
-      if (!mounted) return;
-      setState(() => _saving = false);
-      _showError('Ошибка сохранения: $e');
+      if (mounted) _showError('Ошибка сохранения: $e');
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
 
@@ -134,11 +214,13 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
   }
 
+  // ── Build ──────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Новая накладная'),
+        title: Text(_isEdit ? 'Редактировать накладную' : 'Новая накладная'),
         actions: [
           TextButton(
             onPressed: _saving ? null : _save,
@@ -151,8 +233,44 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+
+          // ── Шаг 1: Данные клиента ─────────────────────────────────────────
           _card('Шаг 1 — Данные клиента', [
-            _tf('Имя / Организация *', _clientNameC, hint: 'Иванов Иван Иванович'),
+            // Поле с автодополнением
+            TextFormField(
+              controller: _clientNameC,
+              decoration: const InputDecoration(
+                labelText: 'Имя / Организация *',
+                hintText: 'Иванов Иван Иванович',
+                suffixIcon: Icon(Icons.person_outline, size: 18),
+              ),
+              onChanged: (v) { setState(() {}); _searchClients(v); },
+            ),
+            if (_clientSuggestions.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                constraints: const BoxConstraints(maxHeight: 160),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: _clientSuggestions.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (_, i) {
+                    final c = _clientSuggestions[i];
+                    return ListTile(
+                      dense: true,
+                      leading: const Icon(Icons.person, size: 18, color: Color(0xFF1E3A4A)),
+                      title: Text(c.name, style: const TextStyle(fontSize: 13)),
+                      subtitle: c.phone.isNotEmpty ? Text(c.phone, style: const TextStyle(fontSize: 11)) : null,
+                      onTap: () => _selectClient(c),
+                    );
+                  },
+                ),
+              ),
+            ],
             const SizedBox(height: 8),
             _tf('Телефон', _clientPhoneC, keyboard: TextInputType.phone),
             const SizedBox(height: 8),
@@ -181,8 +299,8 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
           ]),
           const SizedBox(height: 12),
 
+          // ── Шаг 2: Товары ─────────────────────────────────────────────────
           _card('Шаг 2 — Товары', [
-            // Product search
             TextField(
               controller: _productSearchC,
               decoration: const InputDecoration(
@@ -218,8 +336,6 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
               ),
             ],
             const SizedBox(height: 12),
-
-            // Item rows
             ..._items.asMap().entries.map((e) => _ItemRow(
               index: e.key,
               entry: e.value,
@@ -235,6 +351,7 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
           ]),
           const SizedBox(height: 12),
 
+          // ── Шаг 3: Итого ──────────────────────────────────────────────────
           _card('Шаг 3 — Итого', [
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
               const Text('Подытог:', style: TextStyle(color: Colors.grey)),
@@ -264,6 +381,7 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
           ]),
           const SizedBox(height: 12),
 
+          // ── Примечания ────────────────────────────────────────────────────
           _card('Примечания', [
             TextFormField(
               controller: _notesC,
@@ -309,7 +427,7 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
   }
 }
 
-// ─── Item row ───────────────────────────────────────────────────────────────────────────────
+// ─── Item row ──────────────────────────────────────────────────────────────────
 
 class _ItemEntry {
   final int? productId;

@@ -37,7 +37,7 @@ class AppDatabase {
     }
     return openDatabase(
       path,
-      version: 8,
+      version: 9,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -114,6 +114,17 @@ class AppDatabase {
             'ALTER TABLE products ADD COLUMN pack_size REAL NOT NULL DEFAULT 0');
       } catch (_) {}
     }
+    if (oldVersion < 9) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS clients (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL UNIQUE,
+          phone TEXT NOT NULL DEFAULT '',
+          address TEXT NOT NULL DEFAULT '',
+          updated_at TEXT NOT NULL DEFAULT ''
+        )
+      ''');
+    }
   }
 
   Future<void> _createTextureSamplesTable(Database db) async {
@@ -176,6 +187,15 @@ class AppDatabase {
         status TEXT NOT NULL DEFAULT 'draft',
         notes TEXT NOT NULL DEFAULT '',
         created_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS clients (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        phone TEXT NOT NULL DEFAULT '',
+        address TEXT NOT NULL DEFAULT '',
+        updated_at TEXT NOT NULL DEFAULT ''
       )
     ''');
     await db.execute('''
@@ -342,6 +362,14 @@ class AppDatabase {
     return id;
   }
 
+  Future<void> updateProduct(Product p) async {
+    if (p.id == null) return;
+    final db = await database;
+    await db.update('products', p.toMap()..remove('id'),
+        where: 'id = ?', whereArgs: [p.id]);
+    _bumpRevision();
+  }
+
   Future<void> deleteProduct(int id) async {
     final db = await database;
     await db.delete('products', where: 'id = ?', whereArgs: [id]);
@@ -420,6 +448,13 @@ class AppDatabase {
     return db.insert('invoices', map);
   }
 
+  Future<void> updateInvoice(Invoice inv) async {
+    if (inv.id == null) return;
+    final db = await database;
+    await db.update('invoices', inv.toMap()..remove('id'),
+        where: 'id = ?', whereArgs: [inv.id]);
+  }
+
   Future<void> updateInvoiceStatus(int id, InvoiceStatus status) async {
     final db = await database;
     await db.update('invoices', {'status': status.name},
@@ -441,6 +476,32 @@ class AppDatabase {
     final num = rows.first['number'] as String;
     final parts = num.split('-');
     return int.tryParse(parts.last) ?? 0;
+  }
+
+  // ─── Clients ──────────────────────────────────────────────────────
+
+  Future<List<Client>> searchClients(String q) async {
+    final db = await database;
+    final like = '%${q.toLowerCase()}%';
+    final rows = await db.query('clients',
+        where: 'LOWER(name) LIKE ?',
+        whereArgs: [like],
+        orderBy: 'name',
+        limit: 10);
+    return rows.map(Client.fromMap).toList();
+  }
+
+  Future<List<Client>> getAllClients() async {
+    final db = await database;
+    final rows = await db.query('clients', orderBy: 'name');
+    return rows.map(Client.fromMap).toList();
+  }
+
+  Future<void> upsertClient(Client c) async {
+    if (c.name.trim().isEmpty) return;
+    final db = await database;
+    await db.insert('clients', c.toMap()..remove('id'),
+        conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   // ─── Onboarding ───────────────────────────────────────────────────

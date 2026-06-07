@@ -3,6 +3,7 @@ import '../database.dart';
 import '../models.dart';
 import '../utils.dart';
 import '../services/pdf_service.dart';
+import 'invoice_form_screen.dart';
 
 class InvoiceViewScreen extends StatefulWidget {
   final Invoice invoice;
@@ -26,6 +27,21 @@ class _InvoiceViewScreenState extends State<InvoiceViewScreen> {
     if (_invoice.id == null) return;
     await AppDatabase.instance.updateInvoiceStatus(_invoice.id!, status);
     if (mounted) setState(() => _invoice = _invoice.copyWith(status: status));
+  }
+
+  Future<void> _edit() async {
+    final changed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => InvoiceFormScreen(existingInvoice: _invoice),
+      ),
+    );
+    if (changed == true && mounted) {
+      // Перезагружаем обновлённую накладную из БД
+      final invoices = await AppDatabase.instance.getInvoices();
+      final updated = invoices.where((i) => i.id == _invoice.id).firstOrNull;
+      if (updated != null && mounted) setState(() => _invoice = updated);
+    }
   }
 
   Future<void> _delete() async {
@@ -84,6 +100,11 @@ class _InvoiceViewScreenState extends State<InvoiceViewScreen> {
               icon: const Icon(Icons.picture_as_pdf_outlined),
               tooltip: 'Скачать PDF',
             ),
+          IconButton(
+            onPressed: _edit,
+            icon: const Icon(Icons.edit_outlined),
+            tooltip: 'Редактировать',
+          ),
           IconButton(
             onPressed: _delete,
             icon: const Icon(Icons.delete_outline),

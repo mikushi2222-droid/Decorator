@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import '../database.dart';
+import 'plaster_selector_screen.dart';
 
 // ─── Data model ───────────────────────────────────────────────────────────────
 
@@ -425,6 +426,14 @@ class _SamplesScreenState extends State<SamplesScreen> {
               icon: Icon(_sortMode ? Icons.check_circle_outline : Icons.swap_vert,
                   color: _sortMode ? Colors.green : null),
               onPressed: () => setState(() => _sortMode = !_sortMode),
+            ),
+            TextButton.icon(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const PlasterSelectorScreen()),
+              ),
+              icon: const Icon(Icons.auto_awesome, size: 16),
+              label: const Text('Подобрать'),
             ),
             FilledButton.icon(
               onPressed: _addNew,

@@ -173,19 +173,31 @@ class Invoice {
     required this.createdAt,
   });
 
-  Invoice copyWith({InvoiceStatus? status}) => Invoice(
+  Invoice copyWith({
+    String? number,
+    DateTime? date,
+    String? clientName,
+    String? clientPhone,
+    String? clientAddress,
+    List<InvoiceItem>? items,
+    double? subtotal,
+    double? discount,
+    double? total,
+    InvoiceStatus? status,
+    String? notes,
+  }) => Invoice(
         id: id,
-        number: number,
-        date: date,
-        clientName: clientName,
-        clientPhone: clientPhone,
-        clientAddress: clientAddress,
-        items: items,
-        subtotal: subtotal,
-        discount: discount,
-        total: total,
+        number: number ?? this.number,
+        date: date ?? this.date,
+        clientName: clientName ?? this.clientName,
+        clientPhone: clientPhone ?? this.clientPhone,
+        clientAddress: clientAddress ?? this.clientAddress,
+        items: items ?? this.items,
+        subtotal: subtotal ?? this.subtotal,
+        discount: discount ?? this.discount,
+        total: total ?? this.total,
         status: status ?? this.status,
-        notes: notes,
+        notes: notes ?? this.notes,
         createdAt: createdAt,
       );
 
@@ -223,6 +235,32 @@ class Invoice {
       createdAt: DateTime.parse(m['created_at'] as String),
     );
   }
+}
+
+// ─── Client ──────────────────────────────────────────────────────────────────
+
+class Client {
+  final int? id;
+  final String name;
+  final String phone;
+  final String address;
+
+  const Client({this.id, required this.name, required this.phone, required this.address});
+
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'name': name,
+        'phone': phone,
+        'address': address,
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+
+  factory Client.fromMap(Map<String, dynamic> m) => Client(
+        id: m['id'] as int?,
+        name: (m['name'] as String?) ?? '',
+        phone: (m['phone'] as String?) ?? '',
+        address: (m['address'] as String?) ?? '',
+      );
 }
 
 // ─── StoreSettings ────────────────────────────────────────────────────────────
