@@ -5,6 +5,7 @@ import 'calculator_screen.dart';
 import 'invoices_screen.dart';
 import 'catalog_screen.dart';
 import 'samples_screen.dart';
+import 'training_screen.dart';
 import 'settings_screen.dart';
 import 'onboarding_screen.dart';
 
@@ -23,6 +24,7 @@ class _HomeScreenState extends State<HomeScreen> {
     InvoicesScreen(),
     CatalogScreen(),
     SamplesScreen(),
+    TrainingScreen(),
     SettingsScreen(),
   ];
 
@@ -80,6 +82,10 @@ class _HomeScreenState extends State<HomeScreen> {
               selectedIcon: Icon(Icons.palette),
               label: 'Галерея'),
           NavigationDestination(
+              icon: Icon(Icons.school_outlined),
+              selectedIcon: Icon(Icons.school),
+              label: 'Обучение'),
+          NavigationDestination(
               icon: Icon(Icons.settings_outlined),
               selectedIcon: Icon(Icons.settings),
               label: 'Настройки'),
@@ -123,6 +129,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   icon: Icon(Icons.palette_outlined),
                   selectedIcon: Icon(Icons.palette),
                   label: Text('Галерея')),
+              NavigationRailDestination(
+                  icon: Icon(Icons.school_outlined),
+                  selectedIcon: Icon(Icons.school),
+                  label: Text('Обучение')),
               NavigationRailDestination(
                   icon: Icon(Icons.settings_outlined),
                   selectedIcon: Icon(Icons.settings),
