@@ -101,8 +101,12 @@ jobs:
         run: flutter pub get
         working-directory: C:/tmp/winapp
 
+      - name: Отключить Android-иконки (нет android/ на Windows-раннере)
+        shell: bash
+        run: sed -i 's/android: true/android: false/' C:/tmp/winapp/pubspec.yaml
+
       - name: Генерировать иконки
-        run: dart run flutter_launcher_icons --platforms windows
+        run: dart run flutter_launcher_icons
         working-directory: C:/tmp/winapp
 
       - name: flutter build windows
