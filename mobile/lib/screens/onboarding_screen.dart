@@ -43,8 +43,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           'Полный прайс-лист РРЦ:\nKIITOS · OLSTA · DECORAZZA · BAYRAMIX · PRORAB · ECOTINT · Инструменты.\n\nПоиск по названию, фильтр по брендам.',
     ),
     _CardData(
-      icon: Icons.settings_outlined,
+      icon: Icons.palette_outlined,
       label: 'Шаг 4',
+      title: 'Галерея фактур',
+      body:
+          'Наглядная библиотека покрытий: шёлк, венецианская, травертин, барельеф и другие.\n\nДля каждой фактуры — сложность нанесения, уровень блеска, ценовой диапазон и рекомендуемые материалы.',
+    ),
+    _CardData(
+      icon: Icons.settings_outlined,
+      label: 'Шаг 5',
       title: 'Настройки',
       body:
           'Заполните реквизиты организации — они автоматически появятся на всех накладных.\n\nДобавляйте собственные товары с нормой расхода и настраивайте ставки работ.',

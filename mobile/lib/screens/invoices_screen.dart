@@ -28,20 +28,19 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
     if (!mounted) return;
     setState(() {
       _all = invoices;
-      _filter();
+      _filtered = _applyFilter(_all);
     });
   }
 
-  void _filter() {
+  List<Invoice> _applyFilter(List<Invoice> source) {
     final q = _searchC.text.toLowerCase();
-    setState(() {
-      _filtered = q.isEmpty
-          ? _all
-          : _all.where((inv) =>
-              inv.number.toLowerCase().contains(q) ||
-              inv.clientName.toLowerCase().contains(q)).toList();
-    });
+    if (q.isEmpty) return source;
+    return source.where((inv) =>
+        inv.number.toLowerCase().contains(q) ||
+        inv.clientName.toLowerCase().contains(q)).toList();
   }
+
+  void _filter() => setState(() => _filtered = _applyFilter(_all));
 
   Future<void> _create() async {
     final result = await Navigator.push<bool>(

@@ -388,6 +388,7 @@ class _ProductsTabState extends State<_ProductsTab> {
                           );
                           if (ok == true && p.id != null) {
                             await AppDatabase.instance.deleteProduct(p.id!);
+                            _loadCategories();
                             _search();
                           }
                         },
