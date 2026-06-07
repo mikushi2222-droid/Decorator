@@ -68,9 +68,13 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
       materialCost = materialPacks * _packSize * _selectedProduct!.price;
     }
 
-    final activeRates = _laborRates.where((r) => _selectedRates.contains(r.id)).toList();
+    // В режиме «только материал» ставки работ не учитываем — иначе в результате
+    // появлялись бы строки работ, не входящие в ИТОГО.
+    final activeRates = _mode != 'material'
+        ? _laborRates.where((r) => _selectedRates.contains(r.id)).toList()
+        : <LaborRate>[];
     final laborLines = activeRates.map((r) => _LaborLine(r.name, r.pricePerSqm * area)).toList();
-    final laborCost = _mode != 'material' ? laborLines.fold(0.0, (s, l) => s + l.cost) : 0.0;
+    final laborCost = laborLines.fold(0.0, (s, l) => s + l.cost);
 
     setState(() {
       _result = _CalcResult(

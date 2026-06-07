@@ -21,15 +21,8 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
   List<_ItemEntry> _items = [_ItemEntry()];
   bool _saving = false;
 
-  List<Product> _products = [];
   final _productSearchC = TextEditingController();
   List<Product> _productSuggestions = [];
-
-  @override
-  void initState() {
-    super.initState();
-    AppDatabase.instance.getProducts().then((p) { if (mounted) setState(() => _products = p); });
-  }
 
   void _searchProducts(String q) async {
     if (q.isEmpty) { setState(() => _productSuggestions = []); return; }
