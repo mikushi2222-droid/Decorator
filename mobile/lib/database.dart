@@ -37,7 +37,7 @@ class AppDatabase {
     }
     return openDatabase(
       path,
-      version: 6,
+      version: 7,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -102,6 +102,12 @@ class AppDatabase {
     if (oldVersion < 6) {
       await _createTextureSamplesTable(db);
     }
+    if (oldVersion < 7) {
+      try {
+        await db.execute(
+            'ALTER TABLE texture_samples ADD COLUMN image_path TEXT NOT NULL DEFAULT \'\'');
+      } catch (_) {}
+    }
   }
 
   Future<void> _createTextureSamplesTable(Database db) async {
@@ -118,7 +124,8 @@ class AppDatabase {
         difficulty INTEGER NOT NULL DEFAULT 1,
         price_range TEXT NOT NULL DEFAULT '',
         products TEXT NOT NULL DEFAULT '[]',
-        sort_order INTEGER NOT NULL DEFAULT 0
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        image_path TEXT NOT NULL DEFAULT ''
       )
     ''');
   }

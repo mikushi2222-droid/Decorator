@@ -1,6 +1,10 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
 import '../database.dart';
 
 // ─── Data model ───────────────────────────────────────────────────────────────
@@ -56,6 +60,7 @@ class TextureSample {
   final List<String> products;
   final TexturePattern pattern;
   final int sortOrder;
+  final String imagePath;
 
   const TextureSample({
     this.id,
@@ -70,6 +75,7 @@ class TextureSample {
     required this.products,
     required this.pattern,
     this.sortOrder = 0,
+    this.imagePath = '',
   });
 
   Map<String, Object?> toMap() => {
@@ -85,6 +91,7 @@ class TextureSample {
         'price_range': priceRange,
         'products': jsonEncode(products),
         'sort_order': sortOrder,
+        'image_path': imagePath,
       };
 
   factory TextureSample.fromMap(Map<String, Object?> m) {
@@ -109,6 +116,7 @@ class TextureSample {
       products:
           ((jsonDecode((m['products'] as String?) ?? '[]') as List).cast<String>()),
       sortOrder: (m['sort_order'] as int?) ?? 0,
+      imagePath: (m['image_path'] as String?) ?? '',
     );
   }
 
@@ -125,6 +133,7 @@ class TextureSample {
     List<String>? products,
     TexturePattern? pattern,
     int? sortOrder,
+    String? imagePath,
   }) =>
       TextureSample(
         id: id ?? this.id,
@@ -139,6 +148,7 @@ class TextureSample {
         products: products ?? this.products,
         pattern: pattern ?? this.pattern,
         sortOrder: sortOrder ?? this.sortOrder,
+        imagePath: imagePath ?? this.imagePath,
       );
 }
 
@@ -464,21 +474,25 @@ class _SampleCard extends StatelessWidget {
               // Texture preview (60% of card)
               Expanded(
                 flex: 6,
-                child: CustomPaint(
-                  painter: _TexturePainter(sample.pattern, sample.gradient),
-                  child: Align(
-                    alignment: Alignment.topRight,
-                    child: Container(
-                      margin: const EdgeInsets.all(8),
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: sample.group.color.withOpacity(0.85),
-                        borderRadius: BorderRadius.circular(12),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    _hasImage(sample)
+                        ? Image.file(File(sample.imagePath), fit: BoxFit.cover)
+                        : CustomPaint(painter: _TexturePainter(sample.pattern, sample.gradient)),
+                    Positioned(
+                      top: 8, right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: sample.group.color.withOpacity(0.85),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(sample.group.label,
+                            style: const TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.w600)),
                       ),
-                      child: Text(sample.group.label,
-                          style: const TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.w600)),
                     ),
-                  ),
+                  ],
                 ),
               ),
               // Info (40% of card)
@@ -521,6 +535,9 @@ class _SampleCard extends StatelessWidget {
     );
   }
 
+  bool _hasImage(TextureSample s) =>
+      s.imagePath.isNotEmpty && File(s.imagePath).existsSync();
+
   List<Widget> _sheenDots(int level) {
     return List.generate(3, (i) => Container(
           width: 6, height: 6,
@@ -555,6 +572,12 @@ class _DetailSheet extends StatelessWidget {
   final TextureSample sample;
   const _DetailSheet({required this.sample});
 
+  File? get _imageFile {
+    if (sample.imagePath.isEmpty) return null;
+    final f = File(sample.imagePath);
+    return f.existsSync() ? f : null;
+  }
+
   @override
   Widget build(BuildContext context) {
     return DraggableScrollableSheet(
@@ -582,7 +605,9 @@ class _DetailSheet extends StatelessWidget {
             // Large texture preview
             SizedBox(
               height: 220,
-              child: CustomPaint(painter: _TexturePainter(sample.pattern, sample.gradient)),
+              child: _imageFile != null
+                  ? Image.file(_imageFile!, fit: BoxFit.cover, width: double.infinity)
+                  : CustomPaint(painter: _TexturePainter(sample.pattern, sample.gradient)),
             ),
 
             Padding(
@@ -728,6 +753,7 @@ class _SampleEditScreenState extends State<SampleEditScreen> {
   late List<Color> _gradient;
   late int _sheen;
   late int _difficulty;
+  late String _imagePath;
   bool _saving = false;
 
   bool get _isEdit => widget.sample != null;
@@ -746,7 +772,23 @@ class _SampleEditScreenState extends State<SampleEditScreen> {
     _gradient = s?.gradient ?? _palettes.values.first;
     _sheen = s?.sheenLevel ?? 0;
     _difficulty = s?.difficulty ?? 1;
+    _imagePath = s?.imagePath ?? '';
   }
+
+  Future<void> _pickImage(ImageSource source) async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(source: source, imageQuality: 85, maxWidth: 1200);
+    if (picked == null) return;
+    final dir = await getApplicationDocumentsDirectory();
+    final imgDir = Directory(p.join(dir.path, 'texture_images'));
+    await imgDir.create(recursive: true);
+    final fileName = 'texture_${DateTime.now().millisecondsSinceEpoch}.jpg';
+    final dest = p.join(imgDir.path, fileName);
+    await File(picked.path).copy(dest);
+    setState(() => _imagePath = dest);
+  }
+
+  void _removeImage() => setState(() => _imagePath = '');
 
   @override
   void dispose() {
@@ -788,6 +830,7 @@ class _SampleEditScreenState extends State<SampleEditScreen> {
       gradient: _gradient,
       sheenLevel: _sheen,
       difficulty: _difficulty,
+      imagePath: _imagePath,
     );
     final db = AppDatabase.instance;
     if (_isEdit && widget.sample!.id != null) {
@@ -816,16 +859,40 @@ class _SampleEditScreenState extends State<SampleEditScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // Live preview
+          // Photo / live preview
           ClipRRect(
             borderRadius: BorderRadius.circular(12),
             child: SizedBox(
-              height: 150,
+              height: 160,
               width: double.infinity,
-              child: CustomPaint(painter: _TexturePainter(_pattern, _gradient)),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  _imagePath.isNotEmpty && File(_imagePath).existsSync()
+                      ? Image.file(File(_imagePath), fit: BoxFit.cover)
+                      : CustomPaint(painter: _TexturePainter(_pattern, _gradient)),
+                  // Overlay buttons
+                  Positioned(
+                    bottom: 8, right: 8,
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      if (_imagePath.isNotEmpty)
+                        _overlayBtn(Icons.delete_outline, Colors.red, _removeImage),
+                      const SizedBox(width: 6),
+                      _overlayBtn(Icons.camera_alt_outlined, Colors.white,
+                          () => _pickImage(ImageSource.camera)),
+                      const SizedBox(width: 6),
+                      _overlayBtn(Icons.photo_library_outlined, Colors.white,
+                          () => _pickImage(ImageSource.gallery)),
+                    ]),
+                  ),
+                ],
+              ),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 6),
+          Text('Фото заменяет нарисованную фактуру в карточке.',
+              style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+          const SizedBox(height: 12),
 
           _label('Название'),
           TextFormField(controller: _nameC, decoration: const InputDecoration(hintText: 'Например: Шёлк')),
@@ -942,6 +1009,19 @@ class _SampleEditScreenState extends State<SampleEditScreen> {
     }
     return true;
   }
+
+  Widget _overlayBtn(IconData icon, Color color, VoidCallback onTap) =>
+      GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(7),
+          decoration: BoxDecoration(
+            color: Colors.black54,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, size: 18, color: color),
+        ),
+      );
 
   Widget _label(String text) => Padding(
         padding: const EdgeInsets.only(bottom: 6),

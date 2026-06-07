@@ -19,6 +19,7 @@ dependencies:
   pdf: ^3.11.1
   printing: ^5.13.2
   sqlite3_flutter_libs: ^0.5.24
+  image_picker: ^1.1.2
 
 dev_dependencies:
   flutter_test:
