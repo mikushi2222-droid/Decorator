@@ -3,8 +3,23 @@ import '../database.dart';
 import '../models.dart';
 import '../utils.dart';
 
+// Предзаполнение позиций из калькулятора
+class InvoicePresetItem {
+  final String name;
+  final String unit;
+  final double quantity;
+  final double price;
+  const InvoicePresetItem({
+    required this.name,
+    required this.unit,
+    required this.quantity,
+    required this.price,
+  });
+}
+
 class InvoiceFormScreen extends StatefulWidget {
-  const InvoiceFormScreen({super.key});
+  final List<InvoicePresetItem> presetItems;
+  const InvoiceFormScreen({super.key, this.presetItems = const []});
 
   @override
   State<InvoiceFormScreen> createState() => _InvoiceFormScreenState();
@@ -18,16 +33,37 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
   final _discountC      = TextEditingController();
 
   DateTime _date = DateTime.now();
-  List<_ItemEntry> _items = [_ItemEntry()];
+  late List<_ItemEntry> _items;
   bool _saving = false;
 
   final _productSearchC = TextEditingController();
   List<Product> _productSuggestions = [];
+  Object? _searchToken;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.presetItems.isNotEmpty) {
+      _items = widget.presetItems.map((p) => _ItemEntry(
+        nameC:  TextEditingController(text: p.name),
+        unitC:  TextEditingController(text: p.unit),
+        qtyC:   TextEditingController(text: _fmtQty(p.quantity)),
+        priceC: TextEditingController(text: p.price.toStringAsFixed(2)),
+      )).toList();
+    } else {
+      _items = [_ItemEntry()];
+    }
+  }
+
+  String _fmtQty(double v) =>
+      v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(2);
 
   void _searchProducts(String q) async {
     if (q.isEmpty) { setState(() => _productSuggestions = []); return; }
+    final token = Object();
+    _searchToken = token;
     final res = await AppDatabase.instance.searchProducts(q);
-    if (!mounted) return;
+    if (!mounted || _searchToken != token) return;
     setState(() => _productSuggestions = res.take(30).toList());
   }
 

@@ -35,19 +35,21 @@ class _CatalogScreenState extends State<CatalogScreen> {
 
   Future<void> _loadCategories() async {
     final cats = await AppDatabase.instance.getCategories();
+    final count = await AppDatabase.instance.countProducts();
     if (!mounted) return;
-    setState(() => _categories = ['Все', ...cats]);
+    setState(() {
+      _categories = ['Все', ...cats];
+      _total = count;
+    });
   }
 
   Future<void> _search() async {
     setState(() => _loading = true);
     final cat = _activeCategory == 'Все' ? null : _activeCategory;
     final results = await AppDatabase.instance.searchProducts(_searchC.text, category: cat);
-    final all = await AppDatabase.instance.getProducts();
     if (!mounted) return;
     setState(() {
       _products = results;
-      _total = all.length;
       _loading = false;
     });
   }

@@ -215,17 +215,20 @@ class _ProductsTabState extends State<_ProductsTab> {
 
   Future<void> _loadCategories() async {
     final cats = await AppDatabase.instance.getCategories();
+    final count = await AppDatabase.instance.countProducts();
     if (!mounted) return;
-    setState(() => _categories = ['Все', ...cats]);
+    setState(() {
+      _categories = ['Все', ...cats];
+      _total = count;
+    });
   }
 
   Future<void> _search() async {
     setState(() => _loading = true);
     final cat = _activeCategory == 'Все' ? null : _activeCategory;
     final res = await AppDatabase.instance.searchProducts(_searchC.text, category: cat);
-    final all = await AppDatabase.instance.getProducts();
     if (!mounted) return;
-    setState(() { _products = res; _total = all.length; _loading = false; });
+    setState(() { _products = res; _loading = false; });
   }
 
   Future<void> _showAddDialog() async {
@@ -233,10 +236,12 @@ class _ProductsTabState extends State<_ProductsTab> {
     final unitC = TextEditingController(text: 'кг');
     final priceC = TextEditingController();
     final coverageC = TextEditingController();
+    final packSizeC = TextEditingController();
     final catC = TextEditingController();
 
+    bool inserted = false;
     try {
-      await showDialog(
+      inserted = await showDialog<bool>(
         context: context,
         builder: (_) => AlertDialog(
           title: const Text('Добавить товар'),
@@ -251,14 +256,19 @@ class _ProductsTabState extends State<_ProductsTab> {
                     decoration: const InputDecoration(labelText: 'Цена, ₽ *'))),
               ]),
               const SizedBox(height: 8),
-              TextField(controller: coverageC, keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Расход кг/м² (для калькулятора)')),
+              Row(children: [
+                Expanded(child: TextField(controller: coverageC, keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Расход кг/м²'))),
+                const SizedBox(width: 8),
+                Expanded(child: TextField(controller: packSizeC, keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Фасовка кг'))),
+              ]),
               const SizedBox(height: 8),
               TextField(controller: catC, decoration: const InputDecoration(labelText: 'Категория')),
             ]),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Отмена')),
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Отмена')),
             TextButton(
               onPressed: () async {
                 if (nameC.text.trim().isEmpty || priceC.text.isEmpty) return;
@@ -267,25 +277,29 @@ class _ProductsTabState extends State<_ProductsTab> {
                   unit: unitC.text.trim(),
                   price: double.tryParse(priceC.text) ?? 0,
                   coverage: double.tryParse(coverageC.text) ?? 0,
+                  packSize: double.tryParse(packSizeC.text) ?? 0,
                   category: catC.text.trim(),
                   description: '',
                 ));
-                if (context.mounted) Navigator.pop(context);
+                if (context.mounted) Navigator.pop(context, true);
               },
               child: const Text('Добавить'),
             ),
           ],
         ),
-      );
+      ) == true;
     } finally {
       nameC.dispose();
       unitC.dispose();
       priceC.dispose();
       coverageC.dispose();
+      packSizeC.dispose();
       catC.dispose();
     }
-    _loadCategories();
-    _search();
+    if (inserted) {
+      _loadCategories();
+      _search();
+    }
   }
 
   @override
@@ -421,8 +435,9 @@ class _LaborTabState extends State<_LaborTab> {
     final nameC = TextEditingController();
     final priceC = TextEditingController();
     final unitC = TextEditingController(text: 'м²');
+    bool inserted = false;
     try {
-      await showDialog(
+      inserted = await showDialog<bool>(
         context: context,
         builder: (_) => AlertDialog(
           title: const Text('Добавить вид работ'),
@@ -437,7 +452,7 @@ class _LaborTabState extends State<_LaborTab> {
             ]),
           ]),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Отмена')),
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Отмена')),
             TextButton(
               onPressed: () async {
                 if (nameC.text.trim().isEmpty || priceC.text.isEmpty) return;
@@ -446,19 +461,19 @@ class _LaborTabState extends State<_LaborTab> {
                   pricePerSqm: double.tryParse(priceC.text) ?? 0,
                   unit: unitC.text.trim(),
                 ));
-                if (context.mounted) Navigator.pop(context);
+                if (context.mounted) Navigator.pop(context, true);
               },
               child: const Text('Добавить'),
             ),
           ],
         ),
-      );
+      ) == true;
     } finally {
       nameC.dispose();
       priceC.dispose();
       unitC.dispose();
     }
-    _load();
+    if (inserted) _load();
   }
 
   @override

@@ -37,7 +37,7 @@ class AppDatabase {
     }
     return openDatabase(
       path,
-      version: 7,
+      version: 8,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -108,6 +108,12 @@ class AppDatabase {
             'ALTER TABLE texture_samples ADD COLUMN image_path TEXT NOT NULL DEFAULT \'\'');
       } catch (_) {}
     }
+    if (oldVersion < 8) {
+      try {
+        await db.execute(
+            'ALTER TABLE products ADD COLUMN pack_size REAL NOT NULL DEFAULT 0');
+      } catch (_) {}
+    }
   }
 
   Future<void> _createTextureSamplesTable(Database db) async {
@@ -140,7 +146,8 @@ class AppDatabase {
         price REAL NOT NULL,
         coverage REAL NOT NULL DEFAULT 0,
         category TEXT NOT NULL DEFAULT '',
-        description TEXT NOT NULL DEFAULT ''
+        description TEXT NOT NULL DEFAULT '',
+        pack_size REAL NOT NULL DEFAULT 0
       )
     ''');
     await db.execute('''
@@ -339,6 +346,12 @@ class AppDatabase {
     final db = await database;
     await db.delete('products', where: 'id = ?', whereArgs: [id]);
     _bumpRevision();
+  }
+
+  Future<int> countProducts() async {
+    final db = await database;
+    final rows = await db.rawQuery('SELECT COUNT(*) AS c FROM products');
+    return (rows.first['c'] as int?) ?? 0;
   }
 
   // ─── Labor rates ───────────────────────────────────────────────

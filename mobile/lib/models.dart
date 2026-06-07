@@ -10,6 +10,7 @@ class Product {
   final double coverage;
   final String category;
   final String description;
+  final double packSize; // фасовка в кг/л, 0 = не задана
 
   const Product({
     this.id,
@@ -19,6 +20,7 @@ class Product {
     required this.coverage,
     required this.category,
     required this.description,
+    this.packSize = 0,
   });
 
   Map<String, dynamic> toMap() => {
@@ -29,6 +31,7 @@ class Product {
         'coverage': coverage,
         'category': category,
         'description': description,
+        'pack_size': packSize,
       };
 
   factory Product.fromMap(Map<String, dynamic> m) => Product(
@@ -39,6 +42,7 @@ class Product {
         coverage: (m['coverage'] as num).toDouble(),
         category: (m['category'] as String?) ?? '',
         description: (m['description'] as String?) ?? '',
+        packSize: (m['pack_size'] as num? ?? 0).toDouble(),
       );
 }
 

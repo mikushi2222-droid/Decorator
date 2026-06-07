@@ -280,6 +280,7 @@ class SamplesScreen extends StatefulWidget {
 class _SamplesScreenState extends State<SamplesScreen> {
   TextureGroup? _filter;
   List<TextureSample> _samples = [];
+  Map<int, bool> _imageExists = {};
   bool _loading = true;
   bool _sortMode = false;
   final _searchC = TextEditingController();
@@ -307,8 +308,16 @@ class _SamplesScreenState extends State<SamplesScreen> {
     }
     final rows = await db.getTextureSamples();
     if (!mounted) return;
+    final samples = rows.map(TextureSample.fromMap).toList();
+    final imageExistsMap = <int, bool>{};
+    for (final s in samples) {
+      if (s.id != null && s.imagePath.isNotEmpty) {
+        imageExistsMap[s.id!] = File(s.imagePath).existsSync();
+      }
+    }
     setState(() {
-      _samples = rows.map(TextureSample.fromMap).toList();
+      _samples = samples;
+      _imageExists = imageExistsMap;
       _loading = false;
     });
   }
@@ -328,19 +337,21 @@ class _SamplesScreenState extends State<SamplesScreen> {
   Future<void> _reorder(int oldIndex, int newIndex) async {
     if (newIndex > oldIndex) newIndex--;
     final list = _visible.toList();
+    // Collect the sort_order slots these items currently occupy, sorted ascending.
+    // Reassigning those same slots preserves non-visible items' positions.
+    final slots = (list.map((s) => s.sortOrder).toList()..sort());
     final moved = list.removeAt(oldIndex);
     list.insert(newIndex, moved);
-    // Rebuild full _samples with updated order
-    final visible = list.map((s) => s.id).toSet();
-    final others = _samples.where((s) => !visible.contains(s.id)).toList();
-    final reordered = [...list, ...others];
-    setState(() => _samples = reordered);
-    // Persist sort_order
-    for (var i = 0; i < reordered.length; i++) {
-      final s = reordered[i];
+    final updated = [
+      for (var i = 0; i < list.length; i++) list[i].copyWith(sortOrder: slots[i])
+    ];
+    final updatedById = {for (final s in updated) s.id: s};
+    setState(() {
+      _samples = _samples.map((s) => updatedById[s.id] ?? s).toList();
+    });
+    for (final s in updated) {
       if (s.id != null) {
-        await AppDatabase.instance.updateTextureSample(
-            s.id!, s.copyWith(sortOrder: i).toMap());
+        await AppDatabase.instance.updateTextureSample(s.id!, s.toMap());
       }
     }
   }
@@ -503,6 +514,7 @@ class _SamplesScreenState extends State<SamplesScreen> {
         itemCount: items.length,
         itemBuilder: (_, i) => _SampleCard(
           sample: items[i],
+          hasImage: _imageExists[items[i].id] ?? false,
           onTap: () => _openDetail(items[i]),
         ),
       );
@@ -513,7 +525,7 @@ class _SamplesScreenState extends State<SamplesScreen> {
         itemCount: items.length,
         itemBuilder: (_, i) {
           final s = items[i];
-          final hasImg = s.imagePath.isNotEmpty && File(s.imagePath).existsSync();
+          final hasImg = _imageExists[s.id] ?? false;
           return Card(
             key: ValueKey(s.id ?? i),
             margin: const EdgeInsets.only(bottom: 6),
@@ -568,7 +580,8 @@ class _SamplesScreenState extends State<SamplesScreen> {
 class _SampleCard extends StatelessWidget {
   final TextureSample sample;
   final VoidCallback onTap;
-  const _SampleCard({required this.sample, required this.onTap});
+  final bool hasImage;
+  const _SampleCard({required this.sample, required this.onTap, required this.hasImage});
 
   @override
   Widget build(BuildContext context) {
@@ -589,7 +602,7 @@ class _SampleCard extends StatelessWidget {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    _hasImage(sample)
+                    hasImage
                         ? Image.file(File(sample.imagePath), fit: BoxFit.cover)
                         : CustomPaint(painter: _TexturePainter(sample.pattern, sample.gradient)),
                     Positioned(
@@ -646,9 +659,6 @@ class _SampleCard extends StatelessWidget {
       ),
     );
   }
-
-  bool _hasImage(TextureSample s) =>
-      s.imagePath.isNotEmpty && File(s.imagePath).existsSync();
 
   List<Widget> _sheenDots(int level) {
     return List.generate(3, (i) => Container(
@@ -920,38 +930,47 @@ class _SampleEditScreenState extends State<SampleEditScreen> {
       return;
     }
     setState(() => _saving = true);
-    final products = _productsC.text
-        .split('\n')
-        .map((e) => e.trim())
-        .where((e) => e.isNotEmpty)
-        .toList();
-    final model = (widget.sample ??
-            const TextureSample(
-              name: '', group: TextureGroup.liquid, gradient: [],
-              description: '', effect: '', sheenLevel: 0, difficulty: 1,
-              priceRange: '', products: [], pattern: TexturePattern.base,
-            ))
-        .copyWith(
-      name: _nameC.text.trim(),
-      effect: _effectC.text.trim(),
-      description: _descC.text.trim(),
-      priceRange: _priceC.text.trim(),
-      products: products,
-      group: _group,
-      pattern: _pattern,
-      gradient: _gradient,
-      sheenLevel: _sheen,
-      difficulty: _difficulty,
-      imagePath: _imagePath,
-    );
-    final db = AppDatabase.instance;
-    if (_isEdit && widget.sample!.id != null) {
-      await db.updateTextureSample(widget.sample!.id!, model.toMap());
-    } else {
-      await db.insertTextureSample(model.toMap());
+    try {
+      final products = _productsC.text
+          .split('\n')
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+      final model = (widget.sample ??
+              const TextureSample(
+                name: '', group: TextureGroup.liquid, gradient: [],
+                description: '', effect: '', sheenLevel: 0, difficulty: 1,
+                priceRange: '', products: [], pattern: TexturePattern.base,
+              ))
+          .copyWith(
+        name: _nameC.text.trim(),
+        effect: _effectC.text.trim(),
+        description: _descC.text.trim(),
+        priceRange: _priceC.text.trim(),
+        products: products,
+        group: _group,
+        pattern: _pattern,
+        gradient: _gradient,
+        sheenLevel: _sheen,
+        difficulty: _difficulty,
+        imagePath: _imagePath,
+      );
+      final db = AppDatabase.instance;
+      if (_isEdit && widget.sample!.id != null) {
+        await db.updateTextureSample(widget.sample!.id!, model.toMap());
+      } else {
+        await db.insertTextureSample(model.toMap());
+      }
+      if (!mounted) return;
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Ошибка сохранения: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
-    if (!mounted) return;
-    Navigator.pop(context, true);
   }
 
   @override
@@ -1461,6 +1480,12 @@ class _TexturePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _TexturePainter old) =>
-      old.type != type || old.gradient != gradient;
+  bool shouldRepaint(covariant _TexturePainter old) {
+    if (old.type != type) return true;
+    if (old.gradient.length != gradient.length) return true;
+    for (var i = 0; i < gradient.length; i++) {
+      if (old.gradient[i] != gradient[i]) return true;
+    }
+    return false;
+  }
 }

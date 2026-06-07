@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../database.dart';
 import '../models.dart';
 import '../utils.dart';
+import 'invoice_form_screen.dart';
 
 class CalculatorScreen extends StatefulWidget {
   const CalculatorScreen({super.key});
@@ -17,6 +18,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   final _areaC   = TextEditingController();
 
   bool _useDirectArea = false;
+  bool _useWaste = false; // запас +10%
   Product? _selectedProduct;
   String _mode = 'both'; // 'both' | 'material' | 'labor'
 
@@ -64,9 +66,14 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     }
 
     double materialKg = 0, materialCost = 0;
+    int? packageCount;
     if (_mode != 'labor' && _selectedProduct != null) {
-      materialKg = area * _selectedProduct!.coverage;
+      final margin = _useWaste ? 1.10 : 1.0;
+      materialKg = area * _selectedProduct!.coverage * margin;
       materialCost = materialKg * _selectedProduct!.price;
+      if (_selectedProduct!.packSize > 0) {
+        packageCount = (materialKg / _selectedProduct!.packSize).ceil();
+      }
     }
 
     // В режиме «только материал» ставки работ не учитываем — иначе в результате
@@ -74,7 +81,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     final activeRates = _mode != 'material'
         ? _laborRates.where((r) => _selectedRates.contains(r.id)).toList()
         : <LaborRate>[];
-    final laborLines = activeRates.map((r) => _LaborLine(r.name, r.pricePerSqm * area)).toList();
+    final laborLines = activeRates.map((r) => _LaborLine(r.name, r.pricePerSqm * area, r.pricePerSqm)).toList();
     final laborCost = laborLines.fold(0.0, (s, l) => s + l.cost);
 
     setState(() {
@@ -82,6 +89,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
         area: area,
         materialKg: materialKg,
         materialCost: materialCost,
+        packageCount: packageCount,
+        product: _selectedProduct,
         laborLines: laborLines,
         laborCost: laborCost,
         total: materialCost + laborCost,
@@ -94,8 +103,38 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     setState(() {
       _selectedProduct = null;
       _selectedRates = {};
+      _useWaste = false;
       _result = null;
     });
+  }
+
+  void _createInvoice(BuildContext context, _CalcResult result) {
+    final presetItems = <InvoicePresetItem>[];
+    if (result.materialKg > 0 && result.product != null) {
+      final qty = result.product!.packSize > 0 && result.packageCount != null
+          ? result.packageCount! * result.product!.packSize
+          : result.materialKg;
+      presetItems.add(InvoicePresetItem(
+        name: result.product!.name,
+        unit: result.product!.unit,
+        quantity: double.parse(qty.toStringAsFixed(2)),
+        price: result.product!.price,
+      ));
+    }
+    for (final l in result.laborLines) {
+      presetItems.add(InvoicePresetItem(
+        name: l.name,
+        unit: 'м²',
+        quantity: result.area,
+        price: l.ratePerSqm,
+      ));
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => InvoiceFormScreen(presetItems: presetItems),
+      ),
+    );
   }
 
   @override
@@ -140,6 +179,24 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
               ],
             ] else
               _field('Площадь, м²', _areaC),
+            const SizedBox(height: 8),
+            InkWell(
+              onTap: () => setState(() => _useWaste = !_useWaste),
+              borderRadius: BorderRadius.circular(8),
+              child: Row(children: [
+                Checkbox(
+                  value: _useWaste,
+                  onChanged: (v) => setState(() => _useWaste = v!),
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  visualDensity: VisualDensity.compact,
+                ),
+                const SizedBox(width: 4),
+                const Expanded(
+                  child: Text('Запас +10% (рекомендуется для штукатурок)',
+                      style: TextStyle(fontSize: 13)),
+                ),
+              ]),
+            ),
           ]),
           const SizedBox(height: 12),
 
@@ -243,7 +300,10 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
 
           if (_result != null) ...[
             const SizedBox(height: 16),
-            _ResultCard(result: _result!),
+            _ResultCard(
+              result: _result!,
+              onCreateInvoice: () => _createInvoice(context, _result!),
+            ),
           ],
           const SizedBox(height: 24),
         ],
@@ -333,28 +393,38 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
 class _LaborLine {
   final String name;
   final double cost;
-  _LaborLine(this.name, this.cost);
+  final double ratePerSqm;
+  _LaborLine(this.name, this.cost, this.ratePerSqm);
 }
 
 class _CalcResult {
   final double area;
   final double materialKg;
   final double materialCost;
+  final int? packageCount;
+  final Product? product;
   final List<_LaborLine> laborLines;
   final double laborCost;
   final double total;
   _CalcResult({
     required this.area, required this.materialKg, required this.materialCost,
+    this.packageCount, this.product,
     required this.laborLines, required this.laborCost, required this.total,
   });
 }
 
 class _ResultCard extends StatelessWidget {
   final _CalcResult result;
-  const _ResultCard({required this.result});
+  final VoidCallback onCreateInvoice;
+  const _ResultCard({required this.result, required this.onCreateInvoice});
 
   @override
   Widget build(BuildContext context) {
+    final hasPackInfo = result.materialKg > 0 &&
+        result.product != null &&
+        result.product!.packSize > 0 &&
+        result.packageCount != null;
+
     return Card(
       shape: RoundedRectangleBorder(
         side: const BorderSide(color: Color(0xFF1E3A4A), width: 1.5),
@@ -374,11 +444,14 @@ class _ResultCard extends StatelessWidget {
           _row('Площадь', '${formatNumber(result.area)} м²'),
           if (result.materialKg > 0) ...[
             _row('Потребность', '${formatNumber(result.materialKg)} кг'),
+            if (hasPackInfo)
+              _row('Упаковок купить',
+                  '${result.packageCount} × ${formatNumber(result.product!.packSize)} кг'),
             _row('Стоимость материала', formatCurrency(result.materialCost)),
           ],
           ...result.laborLines.map((l) => _row(l.name, formatCurrency(l.cost))),
           Container(
-            margin: const EdgeInsets.all(14),
+            margin: const EdgeInsets.fromLTRB(14, 4, 14, 0),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
               color: const Color(0xFF1E3A4A),
@@ -390,6 +463,19 @@ class _ResultCard extends StatelessWidget {
               Text(formatCurrency(result.total),
                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20)),
             ]),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
+            child: OutlinedButton.icon(
+              onPressed: onCreateInvoice,
+              icon: const Icon(Icons.receipt_long_outlined, size: 18),
+              label: const Text('Создать накладную'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF1E3A4A),
+                side: const BorderSide(color: Color(0xFF1E3A4A)),
+                minimumSize: const Size(double.infinity, 44),
+              ),
+            ),
           ),
         ],
       ),
