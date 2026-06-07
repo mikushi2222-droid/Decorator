@@ -862,7 +862,7 @@ class _SampleEditScreenState extends State<SampleEditScreen> {
             spacing: 8,
             runSpacing: 8,
             children: _palettes.entries.map((e) {
-              final selected = listEquals(e.value, _gradient);
+              final selected = _sameColors(e.value, _gradient);
               return GestureDetector(
                 onTap: () => setState(() => _gradient = e.value),
                 child: Container(
@@ -933,6 +933,14 @@ class _SampleEditScreenState extends State<SampleEditScreen> {
         ],
       ),
     );
+  }
+
+  bool _sameColors(List<Color> a, List<Color> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
   }
 
   Widget _label(String text) => Padding(
