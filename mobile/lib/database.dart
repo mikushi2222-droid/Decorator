@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 import 'models.dart';
 
@@ -24,7 +26,15 @@ class AppDatabase {
   }
 
   Future<Database> _open() async {
-    final path = join(await getDatabasesPath(), 'decorator.db');
+    final String path;
+    final desktop = !kIsWeb &&
+        (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
+    if (desktop) {
+      final dir = await getApplicationSupportDirectory();
+      path = join(dir.path, 'decorator.db');
+    } else {
+      path = join(await getDatabasesPath(), 'decorator.db');
+    }
     return openDatabase(
       path,
       version: 6,

@@ -1,10 +1,20 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'screens/home_screen.dart';
+
+bool get isDesktop =>
+    !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  if (isDesktop) {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+  }
   await initializeDateFormatting('ru_RU', null);
   runApp(const DecoratorApp());
 }

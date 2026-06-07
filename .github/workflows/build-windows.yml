@@ -1,0 +1,137 @@
+name: Сборка Windows EXE
+
+on:
+  push:
+    branches: [main, 'claude/**']
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Версия (например v0.1.0)'
+        required: true
+        default: 'v0.1.0'
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    name: Build Windows
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Flutter (latest stable)
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Определить версию
+        id: ver
+        shell: bash
+        run: |
+          SHA=$(git rev-parse --short HEAD)
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ github.event.inputs.version }}"
+            VERSION="${TAG#v}"
+          elif [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+            VERSION="${TAG#v}"
+          else
+            TAG="dev-$SHA"
+            VERSION=""
+          fi
+          echo "tag=$TAG"         >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "label=${VERSION:-dev-$SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Скопировать шрифты
+        shell: bash
+        run: mkdir -p mobile/assets/fonts
+
+      - name: Скачать шрифты NotoSans
+        shell: pwsh
+        run: |
+          $base = "https://github.com/googlefonts/noto-fonts/raw/refs/heads/main/hinted/ttf/NotoSans"
+          $fonts = @("NotoSans-Regular.ttf", "NotoSans-Bold.ttf", "NotoSans-Italic.ttf")
+          foreach ($f in $fonts) {
+            $dest = "mobile/assets/fonts/$f"
+            if (-not (Test-Path $dest)) {
+              Invoke-WebRequest -Uri "$base/$f" -OutFile $dest
+            }
+          }
+          foreach ($f in $fonts) {
+            $size = (Get-Item "mobile/assets/fonts/$f").Length
+            if ($size -lt 50000) {
+              Write-Error "Шрифт $f слишком мал ($size байт) — PDF будет сломан."
+              exit 1
+            }
+          }
+
+      - name: Scaffold Flutter-проекта
+        shell: bash
+        run: |
+          flutter create --org com.ooo_akcent --project-name decorator --platforms=windows C:/tmp/winapp
+          cp -r mobile/lib       C:/tmp/winapp/
+          cp -r mobile/assets    C:/tmp/winapp/
+          cp    mobile/pubspec.yaml C:/tmp/winapp/
+
+      - name: Версия в pubspec.yaml
+        shell: bash
+        run: |
+          VER="${{ steps.ver.outputs.version }}"
+          if [ -n "$VER" ]; then
+            sed -i "s/^version:.*/version: ${VER}+1/" C:/tmp/winapp/pubspec.yaml
+          fi
+
+      - name: Имя приложения (Runner.rc)
+        shell: pwsh
+        run: |
+          $rc = "C:/tmp/winapp/windows/runner/Runner.rc"
+          if (Test-Path $rc) {
+            (Get-Content $rc) -replace 'VALUE "FileDescription".*', 'VALUE "FileDescription", "Декоратор"' `
+                              -replace 'VALUE "ProductName".*',     'VALUE "ProductName", "Декоратор"' |
+            Set-Content $rc
+          }
+
+      - name: flutter pub get
+        run: flutter pub get
+        working-directory: C:/tmp/winapp
+
+      - name: flutter build windows
+        run: flutter build windows --release
+        working-directory: C:/tmp/winapp
+
+      - name: Упаковать в ZIP
+        shell: pwsh
+        run: |
+          $label = "${{ steps.ver.outputs.label }}"
+          $src   = "C:/tmp/winapp/build/windows/x64/runner/Release"
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Compress-Archive -Path "$src/*" -DestinationPath "dist/Decorator-${label}-windows.zip"
+
+      - name: Загрузить артефакт (все запуски)
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-${{ steps.ver.outputs.label }}
+          path: dist/
+          retention-days: 30
+
+      - name: GitHub Release (только тег или dispatch)
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: Декоратор ${{ steps.ver.outputs.version }}
+          body: |
+            ## Windows
+
+            Распакуйте `Decorator-*-windows.zip` и запустите `decorator.exe`.
+          files: dist/Decorator-${{ steps.ver.outputs.label }}-windows.zip
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
