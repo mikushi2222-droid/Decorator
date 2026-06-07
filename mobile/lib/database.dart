@@ -19,7 +19,7 @@ class AppDatabase {
     final path = join(await getDatabasesPath(), 'decorator.db');
     return openDatabase(
       path,
-      version: 4,
+      version: 5,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -50,6 +50,36 @@ class AppDatabase {
         await db.insert('products', p);
       }
     }
+    if (oldVersion < 5) {
+      // Добавить колонки рыночных цен
+      await db.execute('ALTER TABLE labor_rates ADD COLUMN market_min REAL NOT NULL DEFAULT 0');
+      await db.execute('ALTER TABLE labor_rates ADD COLUMN market_median REAL NOT NULL DEFAULT 0');
+      await db.execute('ALTER TABLE labor_rates ADD COLUMN market_max REAL NOT NULL DEFAULT 0');
+
+      // Обновить цены до верхней границы рынка + заполнить диапазоны
+      final marketData = {
+        '1-й слой декоративной штукатурки (база)': [150.0, 280.0, 450.0],
+        '2-й слой декоративной штукатурки (слой)': [300.0, 450.0, 650.0],
+        '3-й слой декоративной штукатурки (слой)': [250.0, 400.0, 600.0],
+        'Шёлк':      [700.0,  1100.0, 1600.0],
+        'Велюр':     [700.0,  1100.0, 1600.0],
+        'Замша':     [900.0,  1350.0, 1800.0],
+        'Песок':     [400.0,   650.0,  900.0],
+        'Травертин': [1000.0, 1400.0, 1800.0],
+        'Мармарин':  [1500.0, 2200.0, 3000.0],
+        'Барельеф':  [5000.0, 8500.0, 15000.0],
+        'Мрамор (венецианская)': [2500.0, 3800.0, 5000.0],
+      };
+      for (final entry in marketData.entries) {
+        final min = entry.value[0];
+        final median = entry.value[1];
+        final max = entry.value[2];
+        await db.execute(
+          'UPDATE labor_rates SET price_per_sqm = ?, market_min = ?, market_median = ?, market_max = ? WHERE name = ?',
+          [max, min, median, max, entry.key],
+        );
+      }
+    }
   }
 
   Future<void> _createTables(Database db) async {
@@ -69,7 +99,10 @@ class AppDatabase {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         price_per_sqm REAL NOT NULL,
-        unit TEXT NOT NULL DEFAULT 'м²'
+        unit TEXT NOT NULL DEFAULT 'м²',
+        market_min REAL NOT NULL DEFAULT 0,
+        market_median REAL NOT NULL DEFAULT 0,
+        market_max REAL NOT NULL DEFAULT 0
       )
     ''');
     await db.execute('''
@@ -111,18 +144,19 @@ class AppDatabase {
   }
 
   Future<void> _seedLaborRates(Database db) async {
+    // price_per_sqm = верхняя граница рынка (для выставления клиенту)
     final rates = [
-      {'name': '1-й слой декоративной штукатурки (база)', 'price_per_sqm': 300.0, 'unit': 'м²'},
-      {'name': '2-й слой декоративной штукатурки (слой)', 'price_per_sqm': 350.0, 'unit': 'м²'},
-      {'name': '3-й слой декоративной штукатурки (слой)', 'price_per_sqm': 350.0, 'unit': 'м²'},
-      {'name': 'Шёлк',      'price_per_sqm': 650.0,  'unit': 'м²'},
-      {'name': 'Велюр',      'price_per_sqm': 700.0,  'unit': 'м²'},
-      {'name': 'Замша',      'price_per_sqm': 750.0,  'unit': 'м²'},
-      {'name': 'Песок',      'price_per_sqm': 500.0,  'unit': 'м²'},
-      {'name': 'Травертин',  'price_per_sqm': 850.0,  'unit': 'м²'},
-      {'name': 'Мармарин',   'price_per_sqm': 900.0,  'unit': 'м²'},
-      {'name': 'Барельеф',   'price_per_sqm': 1500.0, 'unit': 'м²'},
-      {'name': 'Мрамор (венецианская)', 'price_per_sqm': 1200.0, 'unit': 'м²'},
+      {'name': '1-й слой декоративной штукатурки (база)', 'price_per_sqm': 450.0,   'unit': 'м²', 'market_min': 150.0,  'market_median': 280.0,  'market_max': 450.0},
+      {'name': '2-й слой декоративной штукатурки (слой)', 'price_per_sqm': 650.0,   'unit': 'м²', 'market_min': 300.0,  'market_median': 450.0,  'market_max': 650.0},
+      {'name': '3-й слой декоративной штукатурки (слой)', 'price_per_sqm': 600.0,   'unit': 'м²', 'market_min': 250.0,  'market_median': 400.0,  'market_max': 600.0},
+      {'name': 'Шёлк',                   'price_per_sqm': 1600.0,  'unit': 'м²', 'market_min': 700.0,  'market_median': 1100.0, 'market_max': 1600.0},
+      {'name': 'Велюр',                  'price_per_sqm': 1600.0,  'unit': 'м²', 'market_min': 700.0,  'market_median': 1100.0, 'market_max': 1600.0},
+      {'name': 'Замша',                  'price_per_sqm': 1800.0,  'unit': 'м²', 'market_min': 900.0,  'market_median': 1350.0, 'market_max': 1800.0},
+      {'name': 'Песок',                  'price_per_sqm': 900.0,   'unit': 'м²', 'market_min': 400.0,  'market_median': 650.0,  'market_max': 900.0},
+      {'name': 'Травертин',              'price_per_sqm': 1800.0,  'unit': 'м²', 'market_min': 1000.0, 'market_median': 1400.0, 'market_max': 1800.0},
+      {'name': 'Мармарин',               'price_per_sqm': 3000.0,  'unit': 'м²', 'market_min': 1500.0, 'market_median': 2200.0, 'market_max': 3000.0},
+      {'name': 'Барельеф',               'price_per_sqm': 15000.0, 'unit': 'м²', 'market_min': 5000.0, 'market_median': 8500.0, 'market_max': 15000.0},
+      {'name': 'Мрамор (венецианская)',  'price_per_sqm': 5000.0,  'unit': 'м²', 'market_min': 2500.0, 'market_median': 3800.0, 'market_max': 5000.0},
     ];
     for (final r in rates) {
       await db.insert('labor_rates', r);

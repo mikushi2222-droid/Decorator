@@ -3,6 +3,7 @@ import '../database.dart';
 import '../models.dart';
 import '../utils.dart';
 import 'onboarding_screen.dart';
+import 'samples_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -18,7 +19,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 3, vsync: this);
+    _tabs = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -31,6 +32,7 @@ class _SettingsScreenState extends State<SettingsScreen>
             Tab(icon: Icon(Icons.store, size: 18), text: 'Реквизиты'),
             Tab(icon: Icon(Icons.inventory_2_outlined, size: 18), text: 'Товары'),
             Tab(icon: Icon(Icons.construction_outlined, size: 18), text: 'Работы'),
+            Tab(icon: Icon(Icons.texture, size: 18), text: 'Примеры'),
           ],
           labelColor: const Color(0xFF1E3A4A),
           indicatorColor: const Color(0xFF1E3A4A),
@@ -42,6 +44,7 @@ class _SettingsScreenState extends State<SettingsScreen>
               _StoreSettingsTab(),
               _ProductsTab(),
               _LaborTab(),
+              SamplesScreen(),
             ],
           ),
         ),
@@ -490,8 +493,19 @@ class _LaborTabState extends State<_LaborTab> {
                     final r = _rates[i];
                     return ListTile(
                       title: Text(r.name, style: const TextStyle(fontSize: 14)),
-                      subtitle: Text('${formatCurrency(r.pricePerSqm)} за ${r.unit}',
-                          style: const TextStyle(fontSize: 12)),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('${formatCurrency(r.pricePerSqm)} за ${r.unit}',
+                              style: const TextStyle(fontSize: 12)),
+                          if (r.hasMarketData)
+                            Text(
+                              'Рынок: от ${formatCurrency(r.marketMin)} · медиана ${formatCurrency(r.marketMedian)} · макс ${formatCurrency(r.marketMax)}',
+                              style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
+                            ),
+                        ],
+                      ),
+                      isThreeLine: r.hasMarketData,
                       trailing: IconButton(
                         icon: const Icon(Icons.delete_outline, size: 18, color: Colors.redAccent),
                         onPressed: () async {

@@ -49,19 +49,30 @@ class LaborRate {
   final String name;
   final double pricePerSqm;
   final String unit;
+  final double marketMin;
+  final double marketMedian;
+  final double marketMax;
 
   const LaborRate({
     this.id,
     required this.name,
     required this.pricePerSqm,
     required this.unit,
+    this.marketMin = 0,
+    this.marketMedian = 0,
+    this.marketMax = 0,
   });
+
+  bool get hasMarketData => marketMax > 0;
 
   Map<String, dynamic> toMap() => {
         'id': id,
         'name': name,
         'price_per_sqm': pricePerSqm,
         'unit': unit,
+        'market_min': marketMin,
+        'market_median': marketMedian,
+        'market_max': marketMax,
       };
 
   factory LaborRate.fromMap(Map<String, dynamic> m) => LaborRate(
@@ -69,6 +80,9 @@ class LaborRate {
         name: m['name'] as String,
         pricePerSqm: (m['price_per_sqm'] as num).toDouble(),
         unit: m['unit'] as String,
+        marketMin: (m['market_min'] as num? ?? 0).toDouble(),
+        marketMedian: (m['market_median'] as num? ?? 0).toDouble(),
+        marketMax: (m['market_max'] as num? ?? 0).toDouble(),
       );
 }
 

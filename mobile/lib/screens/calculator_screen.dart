@@ -203,7 +203,20 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                       Icon(sel ? Icons.check_box : Icons.check_box_outline_blank,
                           color: sel ? const Color(0xFF1E3A4A) : Colors.grey, size: 20),
                       const SizedBox(width: 10),
-                      Expanded(child: Text(r.name, style: const TextStyle(fontSize: 13))),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(r.name, style: const TextStyle(fontSize: 13)),
+                            if (r.hasMarketData)
+                              Text(
+                                'Рынок: ${formatCurrency(r.marketMin)} – ${formatCurrency(r.marketMax)}',
+                                style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
+                              ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 6),
                       Text(formatCurrency(r.pricePerSqm),
                           style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
                     ]),
