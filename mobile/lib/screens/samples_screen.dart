@@ -875,12 +875,16 @@ class _SampleEditScreenState extends State<SampleEditScreen> {
                   Positioned(
                     bottom: 8, right: 8,
                     child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      if (_imagePath.isNotEmpty)
+                      if (_imagePath.isNotEmpty) ...[
                         _overlayBtn(Icons.delete_outline, Colors.red, _removeImage),
-                      const SizedBox(width: 6),
-                      _overlayBtn(Icons.camera_alt_outlined, Colors.white,
-                          () => _pickImage(ImageSource.camera)),
-                      const SizedBox(width: 6),
+                        const SizedBox(width: 6),
+                      ],
+                      // Camera only available on mobile
+                      if (Platform.isAndroid || Platform.isIOS) ...[
+                        _overlayBtn(Icons.camera_alt_outlined, Colors.white,
+                            () => _pickImage(ImageSource.camera)),
+                        const SizedBox(width: 6),
+                      ],
                       _overlayBtn(Icons.photo_library_outlined, Colors.white,
                           () => _pickImage(ImageSource.gallery)),
                     ]),
