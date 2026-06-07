@@ -30,3 +30,7 @@ node_modules/
 
 # Fonts (downloaded by CI)
 mobile/assets/fonts/*.ttf
+
+# Old Go/TS build artifacts
+decorator-test
+tsconfig.tsbuildinfo
