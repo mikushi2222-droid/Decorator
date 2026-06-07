@@ -102,7 +102,7 @@ jobs:
         working-directory: C:/tmp/winapp
 
       - name: Генерировать иконки
-        run: dart run flutter_launcher_icons
+        run: dart run flutter_launcher_icons --platforms windows
         working-directory: C:/tmp/winapp
 
       - name: flutter build windows
