@@ -28,12 +28,13 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
   @override
   void initState() {
     super.initState();
-    AppDatabase.instance.getProducts().then((p) => setState(() => _products = p));
+    AppDatabase.instance.getProducts().then((p) { if (mounted) setState(() => _products = p); });
   }
 
   void _searchProducts(String q) async {
     if (q.isEmpty) { setState(() => _productSuggestions = []); return; }
     final res = await AppDatabase.instance.searchProducts(q);
+    if (!mounted) return;
     setState(() => _productSuggestions = res.take(30).toList());
   }
 
@@ -93,12 +94,14 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
       await db.insertInvoice(invoice);
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
+      if (!mounted) return;
       setState(() => _saving = false);
       _showError('Ошибка сохранения: $e');
     }
   }
 
   void _showError(String msg) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
   }
 
@@ -277,7 +280,7 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
   }
 }
 
-// ─── Item row ─────────────────────────────────────────────────────────────────
+// ─── Item row ───────────────────────────────────────────────────────────────────────────────
 
 class _ItemEntry {
   final int? productId;

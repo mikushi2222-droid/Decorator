@@ -9,9 +9,9 @@ class PdfService {
   static Future<Uint8List> buildInvoicePdf(Invoice invoice, StoreSettings settings) async {
     final pdf = pw.Document();
 
-    final regularFont = await PdfGoogleFonts.robotoRegular();
-    final boldFont    = await PdfGoogleFonts.robotoBold();
-    final italicFont  = await PdfGoogleFonts.robotoItalic();
+    final regularFont = await PdfGoogleFonts.notoSansRegular();
+    final boldFont    = await PdfGoogleFonts.notoSansBold();
+    final italicFont  = await PdfGoogleFonts.notoSansItalic();
 
     final brand = PdfColor.fromHex('#1E3A4A');
 
