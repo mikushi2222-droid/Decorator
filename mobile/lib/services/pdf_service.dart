@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -9,9 +10,9 @@ class PdfService {
   static Future<Uint8List> buildInvoicePdf(Invoice invoice, StoreSettings settings) async {
     final pdf = pw.Document();
 
-    final regularFont = await PdfGoogleFonts.notoSansRegular();
-    final boldFont    = await PdfGoogleFonts.notoSansBold();
-    final italicFont  = await PdfGoogleFonts.notoSansItalic();
+    final regularFont = pw.Font.ttf(await rootBundle.load('assets/fonts/NotoSans-Regular.ttf'));
+    final boldFont    = pw.Font.ttf(await rootBundle.load('assets/fonts/NotoSans-Bold.ttf'));
+    final italicFont  = pw.Font.ttf(await rootBundle.load('assets/fonts/NotoSans-Italic.ttf'));
 
     final brand = PdfColor.fromHex('#1E3A4A');
 
