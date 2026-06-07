@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../main.dart';
 import '../database.dart';
 import '../models.dart';
 import '../utils.dart';
@@ -43,11 +44,17 @@ class _CatalogScreenState extends State<CatalogScreen> {
     });
   }
 
+  Object? _searchToken;
+
   Future<void> _search() async {
     setState(() => _loading = true);
     final cat = _activeCategory == 'Все' ? null : _activeCategory;
+    // Защита от гонки: при быстром наборе ранний (медленный) запрос не должен
+    // перезаписать результат более позднего.
+    final token = Object();
+    _searchToken = token;
     final results = await AppDatabase.instance.searchProducts(_searchC.text, category: cat);
-    if (!mounted) return;
+    if (!mounted || _searchToken != token) return;
     setState(() {
       _products = results;
       _loading = false;
@@ -65,7 +72,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
           child: TextField(
             controller: _searchC,
             decoration: InputDecoration(
-              hintText: 'Поиск по каталогу (${_total} позиций)…',
+              hintText: 'Поиск по каталогу ($_total позиций)…',
               prefixIcon: const Icon(Icons.search, size: 20),
               suffixIcon: _searchC.text.isNotEmpty
                   ? IconButton(
@@ -96,7 +103,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
                   setState(() => _activeCategory = cat);
                   _search();
                 },
-                selectedColor: const Color(0xFF1E3A4A),
+                selectedColor: kBronze,
                 labelStyle: TextStyle(
                   color: active ? Colors.white : null,
                   fontSize: 12,
@@ -171,7 +178,7 @@ class _ProductTile extends StatelessWidget {
               const SizedBox(height: 2),
               Row(children: [
                 Text(formatCurrency(product.price),
-                    style: const TextStyle(color: Color(0xFF1E3A4A), fontWeight: FontWeight.bold)),
+                    style: const TextStyle(color: kBronze, fontWeight: FontWeight.bold)),
                 Text(' / ${product.unit}',
                     style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
                 if (product.category.isNotEmpty) ...[

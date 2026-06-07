@@ -51,19 +51,29 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   bool get _isLast => _page == _totalPages - 1;
   bool get _isInfoPage => _page < _infoCards.length;
 
+  bool _finishing = false;
+
   Future<void> _finish() async {
-    // Сохранить имя если введено
-    final name = _nameC.text.trim();
-    if (name.isNotEmpty) {
-      await AppDatabase.instance.saveDecoratorName(name);
+    if (_finishing) return; // защита от двойного нажатия
+    _finishing = true;
+    try {
+      final name = _nameC.text.trim();
+      // Сохраняем имя и тип деятельности одним обновлением настроек.
+      final settings = await AppDatabase.instance.getSettings();
+      await AppDatabase.instance.saveSettings(settings.copyWith(
+        decoratorName: name,
+        businessType: _businessType,
+      ));
+      await AppDatabase.instance.markOnboardingShown();
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      _finishing = false;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Не удалось сохранить: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
-    // Сохранить тип деятельности
-    final settings = await AppDatabase.instance.getSettings();
-    await AppDatabase.instance.saveSettings(
-      settings.copyWith(businessType: _businessType),
-    );
-    await AppDatabase.instance.markOnboardingShown();
-    if (mounted) Navigator.pop(context);
   }
 
   void _next() {

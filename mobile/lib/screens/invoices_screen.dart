@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../database.dart';
+import '../main.dart';
 import '../models.dart';
 import '../utils.dart';
 import 'invoice_form_screen.dart';
@@ -21,6 +22,9 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
   void initState() {
     super.initState();
     _load();
+    // Перезагружаемся при любом изменении накладных (смена статуса, удаление,
+    // создание из другого экрана) — иначе из-за IndexedStack список устаревает.
+    AppDatabase.instance.dataRevision.addListener(_load);
   }
 
   Future<void> _load() async {
@@ -86,7 +90,7 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
               icon: const Icon(Icons.add, size: 18),
               label: const Text('Создать'),
               style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF1E3A4A),
+                backgroundColor: kBronze,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
               ),
@@ -129,6 +133,7 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
 
   @override
   void dispose() {
+    AppDatabase.instance.dataRevision.removeListener(_load);
     _searchC.dispose();
     super.dispose();
   }
@@ -189,7 +194,7 @@ class _InvoiceTile extends StatelessWidget {
                         style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
-                            color: Color(0xFF1E3A4A))),
+                            color: kBronze)),
                   ]),
                 ),
               ),

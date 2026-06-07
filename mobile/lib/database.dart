@@ -6,10 +6,11 @@ import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 import 'models.dart';
+import 'utils.dart';
 
 class AppDatabase {
   static final AppDatabase instance = AppDatabase._();
-  static Database? _db;
+  static Future<Database>? _dbFuture;
 
   /// Версия справочников (товары + ставки работ). Увеличивается при любом
   /// изменении каталога или работ. Экраны Калькулятора и Каталога слушают её,
@@ -20,10 +21,9 @@ class AppDatabase {
 
   AppDatabase._();
 
-  Future<Database> get database async {
-    _db ??= await _open();
-    return _db!;
-  }
+  // Мемоизируем сам Future, а не результат: иначе два параллельных вызова
+  // на старте (getProducts/getSettings/... одновременно) откроют БД дважды.
+  Future<Database> get database => _dbFuture ??= _open();
 
   Future<Database> _open() async {
     final String path;
@@ -37,7 +37,7 @@ class AppDatabase {
     }
     return openDatabase(
       path,
-      version: 10,
+      version: 11,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -126,6 +126,18 @@ class AppDatabase {
       ''');
     }
     if (oldVersion < 10) {
+      for (final col in const ['decorator_name', 'business_type']) {
+        try {
+          final def = col == 'business_type' ? "'ooo'" : "''";
+          await db.execute(
+              'ALTER TABLE settings ADD COLUMN $col TEXT NOT NULL DEFAULT $def');
+        } catch (_) {}
+      }
+    }
+    if (oldVersion < 11) {
+      // Подстраховка: ранняя сборка v10 создавала settings без этих колонок
+      // (их не было в CREATE TABLE), а onUpgrade для неё уже не запускался.
+      // Идемпотентно добавляем недостающие колонки.
       for (final col in const ['decorator_name', 'business_type']) {
         try {
           final def = col == 'business_type' ? "'ooo'" : "''";
@@ -223,7 +235,9 @@ class AppDatabase {
         bank_inn TEXT NOT NULL DEFAULT '',
         bank_kpp TEXT NOT NULL DEFAULT '',
         ad_text TEXT NOT NULL DEFAULT '',
-        onboarding_shown INTEGER NOT NULL DEFAULT 0
+        onboarding_shown INTEGER NOT NULL DEFAULT 0,
+        decorator_name TEXT NOT NULL DEFAULT '',
+        business_type TEXT NOT NULL DEFAULT 'ooo'
       )
     ''');
   }
@@ -454,7 +468,33 @@ class AppDatabase {
   Future<int> insertInvoice(Invoice inv) async {
     final db = await database;
     final map = inv.toMap()..remove('id');
-    return db.insert('invoices', map);
+    final id = await db.insert('invoices', map);
+    _bumpRevision();
+    return id;
+  }
+
+  /// Создаёт новую накладную, присваивая номер атомарно внутри транзакции:
+  /// чтение последнего номера и вставка происходят в одном изолированном
+  /// действии, поэтому два быстрых сохранения не получат одинаковый номер.
+  /// [build] получает сгенерированный номер и возвращает готовую накладную.
+  /// Возвращает id вставленной строки.
+  Future<int> createInvoiceWithNumber(Invoice Function(String number) build) async {
+    final db = await database;
+    final year = DateTime.now().year;
+    final id = await db.transaction((txn) async {
+      final rows = await txn.rawQuery(
+        "SELECT number FROM invoices WHERE number LIKE 'АКЦ-$year-%'",
+      );
+      var maxSeq = 0;
+      for (final r in rows) {
+        final seq = int.tryParse((r['number'] as String).split('-').last) ?? 0;
+        if (seq > maxSeq) maxSeq = seq;
+      }
+      final invoice = build(generateInvoiceNumber(maxSeq));
+      return txn.insert('invoices', invoice.toMap()..remove('id'));
+    });
+    _bumpRevision();
+    return id;
   }
 
   Future<void> updateInvoice(Invoice inv) async {
@@ -462,30 +502,22 @@ class AppDatabase {
     final db = await database;
     await db.update('invoices', inv.toMap()..remove('id'),
         where: 'id = ?', whereArgs: [inv.id]);
+    _bumpRevision();
   }
 
   Future<void> updateInvoiceStatus(int id, InvoiceStatus status) async {
     final db = await database;
     await db.update('invoices', {'status': status.name},
         where: 'id = ?', whereArgs: [id]);
+    _bumpRevision();
   }
 
   Future<void> deleteInvoice(int id) async {
     final db = await database;
     await db.delete('invoices', where: 'id = ?', whereArgs: [id]);
+    _bumpRevision();
   }
 
-  Future<int> getLastInvoiceSeq() async {
-    final db = await database;
-    final year = DateTime.now().year;
-    final rows = await db.rawQuery(
-      "SELECT number FROM invoices WHERE number LIKE 'АКЦ-$year-%' ORDER BY created_at DESC LIMIT 1",
-    );
-    if (rows.isEmpty) return 0;
-    final num = rows.first['number'] as String;
-    final parts = num.split('-');
-    return int.tryParse(parts.last) ?? 0;
-  }
 
   // ─── Clients ──────────────────────────────────────────────────────
 
@@ -509,8 +541,19 @@ class AppDatabase {
   Future<void> upsertClient(Client c) async {
     if (c.name.trim().isEmpty) return;
     final db = await database;
-    await db.insert('clients', c.toMap()..remove('id'),
-        conflictAlgorithm: ConflictAlgorithm.replace);
+    // Настоящий upsert по уникальному имени: при конфликте ОБНОВЛЯЕМ строку,
+    // сохраняя её id. ConflictAlgorithm.replace делал DELETE+INSERT и менял id,
+    // из-за чего ссылки на клиента «повисали».
+    final map = c.toMap()..remove('id');
+    final updated = await db.update(
+      'clients',
+      map,
+      where: 'name = ?',
+      whereArgs: [c.name.trim()],
+    );
+    if (updated == 0) {
+      await db.insert('clients', map);
+    }
   }
 
   // ─── Onboarding ───────────────────────────────────────────────────

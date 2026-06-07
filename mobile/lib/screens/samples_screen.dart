@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../main.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
@@ -440,7 +441,7 @@ class _SamplesScreenState extends State<SamplesScreen> {
               icon: const Icon(Icons.add, size: 16),
               label: const Text('Добавить'),
               style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF1E3A4A),
+                backgroundColor: kBronze,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               ),
@@ -560,7 +561,7 @@ class _SamplesScreenState extends State<SamplesScreen> {
       );
 
   Widget _chip(String label, bool active, VoidCallback onTap, {Color? color}) {
-    final c = color ?? const Color(0xFF1E3A4A);
+    final c = color ?? kBronze;
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
@@ -655,7 +656,7 @@ class _SampleCard extends StatelessWidget {
                       ]),
                       const SizedBox(height: 4),
                       Text(sample.priceRange,
-                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF1E3A4A)),
+                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: kBronze),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis),
                     ],
@@ -805,8 +806,8 @@ class _DetailSheet extends StatelessWidget {
                         icon: const Icon(Icons.edit_outlined, size: 18),
                         label: const Text('Редактировать'),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFF1E3A4A),
-                          side: const BorderSide(color: Color(0xFF1E3A4A)),
+                          foregroundColor: kBronze,
+                          side: const BorderSide(color: kBronze),
                           padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
                       ),
@@ -1083,7 +1084,7 @@ class _SampleEditScreenState extends State<SampleEditScreen> {
                     gradient: LinearGradient(colors: e.value),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                      color: selected ? const Color(0xFF1E3A4A) : Colors.grey.shade300,
+                      color: selected ? kBronze : Colors.grey.shade300,
                       width: selected ? 2.5 : 1,
                     ),
                   ),
@@ -1191,7 +1192,7 @@ class _SampleEditScreenState extends State<SampleEditScreen> {
               padding: const EdgeInsets.symmetric(vertical: 9),
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: active ? const Color(0xFF1E3A4A) : Colors.grey.shade100,
+                color: active ? kBronze : Colors.grey.shade100,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(

@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../main.dart';
 import '../database.dart';
 import 'samples_screen.dart';
 
@@ -215,7 +216,7 @@ class _PlasterSelectorScreenState extends State<PlasterSelectorScreen> {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
-                  color: results.isEmpty ? Colors.grey : const Color(0xFF1E3A4A),
+                  color: results.isEmpty ? Colors.grey : kBronze,
                 ),
               ),
             ),
@@ -252,7 +253,7 @@ class _PlasterSelectorScreenState extends State<PlasterSelectorScreen> {
 
   Widget _sectionTitle(String text) => Text(
         text,
-        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF1E3A4A)),
+        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: kBronze),
       );
 
   Widget _choiceChip({
@@ -267,10 +268,10 @@ class _PlasterSelectorScreenState extends State<PlasterSelectorScreen> {
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFF1E3A4A) : Colors.grey.shade100,
+          color: selected ? kBronze : Colors.grey.shade100,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: selected ? const Color(0xFF1E3A4A) : Colors.grey.shade300,
+            color: selected ? kBronze : Colors.grey.shade300,
           ),
         ),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -318,17 +319,17 @@ class _EffectTile extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFF1E3A4A) : Colors.grey.shade50,
+          color: selected ? kBronze : Colors.grey.shade50,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: selected ? const Color(0xFF1E3A4A) : Colors.grey.shade200,
+            color: selected ? kBronze : Colors.grey.shade200,
             width: selected ? 2 : 1,
           ),
         ),
         child: Row(children: [
           Icon(effect.icon,
               size: 22,
-              color: selected ? Colors.white : const Color(0xFF1E3A4A)),
+              color: selected ? Colors.white : kBronze),
           const SizedBox(width: 12),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -414,7 +415,7 @@ class _ResultTile extends StatelessWidget {
                   const Spacer(),
                   if (sample.priceRange.isNotEmpty)
                     Text(sample.priceRange,
-                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF1E3A4A))),
+                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: kBronze)),
                 ]),
                 if (maxScore > 0) ...[
                   const SizedBox(height: 6),
@@ -426,7 +427,7 @@ class _ResultTile extends StatelessWidget {
                       backgroundColor: Colors.grey.shade200,
                       valueColor: AlwaysStoppedAnimation(
                         pct >= 0.75 ? Colors.green.shade500 :
-                        pct >= 0.5  ? const Color(0xFF1E3A4A) : Colors.orange.shade400,
+                        pct >= 0.5  ? kBronze : Colors.orange.shade400,
                       ),
                     ),
                   ),
@@ -578,8 +579,8 @@ class _SampleDetailSheet extends StatelessWidget {
                   onPressed: () => Navigator.pop(context),
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size(double.infinity, 44),
-                    foregroundColor: const Color(0xFF1E3A4A),
-                    side: const BorderSide(color: Color(0xFF1E3A4A)),
+                    foregroundColor: kBronze,
+                    side: const BorderSide(color: kBronze),
                   ),
                   child: const Text('Закрыть'),
                 ),

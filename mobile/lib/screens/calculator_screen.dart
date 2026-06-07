@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../main.dart';
 import '../database.dart';
 import '../models.dart';
 import '../utils.dart';
@@ -48,10 +49,10 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   }
 
   double get _calcArea {
-    if (_useDirectArea) return double.tryParse(_areaC.text) ?? 0;
-    final l = double.tryParse(_lengthC.text) ?? 0;
-    final w = double.tryParse(_widthC.text) ?? 0;
-    final h = double.tryParse(_heightC.text) ?? 0;
+    if (_useDirectArea) return parseNum(_areaC.text) ?? 0;
+    final l = parseNum(_lengthC.text) ?? 0;
+    final w = parseNum(_widthC.text) ?? 0;
+    final h = parseNum(_heightC.text) ?? 0;
     if (h > 0) return (l + w) * 2 * h;
     return l * w;
   }
@@ -111,13 +112,13 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   void _createInvoice(BuildContext context, _CalcResult result) {
     final presetItems = <InvoicePresetItem>[];
     if (result.materialKg > 0 && result.product != null) {
-      final qty = result.product!.packSize > 0 && result.packageCount != null
-          ? result.packageCount! * result.product!.packSize
-          : result.materialKg;
+      // В накладную переносим фактический расход материала по цене за единицу —
+      // тогда сумма строки совпадает с materialCost, показанным в результате.
+      // Сколько упаковок докупить — справочная информация на карточке результата.
       presetItems.add(InvoicePresetItem(
         name: result.product!.name,
         unit: result.product!.unit,
-        quantity: double.parse(qty.toStringAsFixed(2)),
+        quantity: double.parse(result.materialKg.toStringAsFixed(2)),
         price: result.product!.price,
       ));
     }
@@ -170,7 +171,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1E3A4A).withOpacity(0.08),
+                    color: kBronze.withOpacity(0.08),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text('Площадь: ${formatNumber(_calcArea)} м²',
@@ -248,13 +249,13 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                     margin: const EdgeInsets.only(bottom: 6),
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     decoration: BoxDecoration(
-                      border: Border.all(color: sel ? const Color(0xFF1E3A4A) : Colors.grey.shade300),
+                      border: Border.all(color: sel ? kBronze : Colors.grey.shade300),
                       borderRadius: BorderRadius.circular(8),
-                      color: sel ? const Color(0xFF1E3A4A).withOpacity(0.06) : null,
+                      color: sel ? kBronze.withOpacity(0.06) : null,
                     ),
                     child: Row(children: [
                       Icon(sel ? Icons.check_box : Icons.check_box_outline_blank,
-                          color: sel ? const Color(0xFF1E3A4A) : Colors.grey, size: 20),
+                          color: sel ? kBronze : Colors.grey, size: 20),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Column(
@@ -314,13 +315,13 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   Widget _infoCard(String text) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: const Color(0xFF1E3A4A).withOpacity(0.07),
+          color: kBronze.withOpacity(0.07),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Row(children: [
-          const Icon(Icons.info_outline, size: 16, color: Color(0xFF1E3A4A)),
+          const Icon(Icons.info_outline, size: 16, color: kBronze),
           const SizedBox(width: 8),
-          Expanded(child: Text(text, style: const TextStyle(fontSize: 13, color: Color(0xFF1E3A4A)))),
+          Expanded(child: Text(text, style: const TextStyle(fontSize: 13, color: kBronze))),
         ]),
       );
 
@@ -355,7 +356,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
           duration: const Duration(milliseconds: 150),
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
-            color: active ? const Color(0xFF1E3A4A) : Colors.grey.shade100,
+            color: active ? kBronze : Colors.grey.shade100,
             borderRadius: BorderRadius.circular(8),
           ),
           alignment: Alignment.center,
@@ -427,7 +428,7 @@ class _ResultCard extends StatelessWidget {
 
     return Card(
       shape: RoundedRectangleBorder(
-        side: const BorderSide(color: Color(0xFF1E3A4A), width: 1.5),
+        side: const BorderSide(color: kBronze, width: 1.5),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -435,7 +436,7 @@ class _ResultCard extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 14, 14, 4),
             child: Row(children: [
-              const Icon(Icons.bar_chart, color: Color(0xFF1E3A4A)),
+              const Icon(Icons.bar_chart, color: kBronze),
               const SizedBox(width: 8),
               const Text('Результат расчёта',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
@@ -454,7 +455,7 @@ class _ResultCard extends StatelessWidget {
             margin: const EdgeInsets.fromLTRB(14, 4, 14, 0),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
-              color: const Color(0xFF1E3A4A),
+              color: kBronze,
               borderRadius: BorderRadius.circular(10),
             ),
             child: Row(children: [
@@ -471,8 +472,8 @@ class _ResultCard extends StatelessWidget {
               icon: const Icon(Icons.receipt_long_outlined, size: 18),
               label: const Text('Создать накладную'),
               style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFF1E3A4A),
-                side: const BorderSide(color: Color(0xFF1E3A4A)),
+                foregroundColor: kBronze,
+                side: const BorderSide(color: kBronze),
                 minimumSize: const Size(double.infinity, 44),
               ),
             ),

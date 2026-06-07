@@ -17,6 +17,7 @@ class PdfService {
     final italicFont  = await _loadFont('assets/fonts/NotoSans-Italic.ttf',  PdfGoogleFonts.notoSansItalic);
 
     final brand = PdfColor.fromHex('#1E3A4A');
+    final logo = await _loadLogo('assets/logo_akcent.jpg');
 
     pdf.addPage(pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
@@ -27,6 +28,14 @@ class PdfService {
         pw.Row(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
+            if (logo != null) ...[
+              pw.Container(
+                width: 54,
+                height: 54,
+                child: pw.Image(logo, fit: pw.BoxFit.contain),
+              ),
+              pw.SizedBox(width: 10),
+            ],
             pw.Expanded(
               child: pw.Column(
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -196,6 +205,16 @@ class PdfService {
       return pw.Font.ttf(await rootBundle.load(asset));
     } catch (_) {
       return fallback();
+    }
+  }
+
+  // Логотип в шапку PDF. Если ассет недоступен — просто не рисуем (PDF не падает).
+  static Future<pw.ImageProvider?> _loadLogo(String asset) async {
+    try {
+      final data = await rootBundle.load(asset);
+      return pw.MemoryImage(data.buffer.asUint8List());
+    } catch (_) {
+      return null;
     }
   }
 

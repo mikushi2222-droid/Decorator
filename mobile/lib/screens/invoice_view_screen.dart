@@ -130,6 +130,15 @@ class _InvoiceViewScreenState extends State<InvoiceViewScreen> {
                       width: 64,
                       height: 64,
                       fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        width: 64,
+                        height: 64,
+                        decoration: BoxDecoration(
+                          color: kGoldLight,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.brush_outlined, color: kBronze),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),

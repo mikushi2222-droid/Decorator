@@ -6,10 +6,27 @@ final _num = NumberFormat('#,##0.##', 'ru_RU');
 final _dateFmt = DateFormat('d MMMM yyyy г.', 'ru_RU');
 final _dateShort = DateFormat('dd.MM.yyyy', 'ru_RU');
 
-String formatCurrency(double v) => '${_rub.format(v)} ₽';
+// Нормализуем -0.0 → 0.0, чтобы не показывать «-0,00 ₽», и округляем до копеек
+// заранее (иначе бинарная погрешность даёт расхождение в копейку).
+double _normCurrency(double v) {
+  final r = (v * 100).roundToDouble() / 100;
+  return r == 0 ? 0.0 : r;
+}
+
+String formatCurrency(double v) => '${_rub.format(_normCurrency(v))} ₽';
 String formatNumber(double v) => _num.format(v);
 String formatDate(DateTime d) => _dateFmt.format(d);
 String formatDateShort(DateTime d) => _dateShort.format(d);
+
+/// Разбор числа из пользовательского ввода: принимает и точку, и русскую
+/// запятую как десятичный разделитель, игнорирует пробелы-разделители разрядов.
+/// Возвращает null, если строка не является числом.
+double? parseNum(String? s) {
+  if (s == null) return null;
+  final cleaned = s.trim().replaceAll(' ', '').replaceAll(' ', '').replaceAll(',', '.');
+  if (cleaned.isEmpty) return null;
+  return double.tryParse(cleaned);
+}
 
 String generateInvoiceNumber(int last) {
   final now = DateTime.now();
@@ -56,9 +73,9 @@ List<Map<String, dynamic>> parseCsvProducts(String csv) {
     result.add({
       'name': f[0].trim(),
       'unit': f.length > 1 ? f[1].trim() : 'шт.',
-      'price': f.length > 2 ? (double.tryParse(f[2]) ?? 0) : 0.0,
-      'coverage': f.length > 3 ? (double.tryParse(f[3]) ?? 0) : 0.0,
-      'pack_size': f.length > 4 ? (double.tryParse(f[4]) ?? 0) : 0.0,
+      'price': f.length > 2 ? (parseNum(f[2]) ?? 0) : 0.0,
+      'coverage': f.length > 3 ? (parseNum(f[3]) ?? 0) : 0.0,
+      'pack_size': f.length > 4 ? (parseNum(f[4]) ?? 0) : 0.0,
       'category': f.length > 5 ? f[5].trim() : '',
       'description': f.length > 6 ? f[6].trim() : '',
     });

@@ -35,21 +35,27 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   }
 
   Future<void> _load() async {
-    final name = await AppDatabase.instance.getDecoratorName();
-    final invoices = await AppDatabase.instance.getInvoices();
-    if (!mounted) return;
-    setState(() {
-      _decoratorName = name;
-      _recentInvoices = invoices.take(5).toList();
-      _loading = false;
-    });
+    try {
+      final name = await AppDatabase.instance.getDecoratorName();
+      final invoices = await AppDatabase.instance.getInvoices();
+      if (!mounted) return;
+      setState(() {
+        _decoratorName = name;
+        _recentInvoices = invoices.take(5).toList();
+        _loading = false;
+      });
+    } catch (_) {
+      // Не оставляем экран в вечном спиннере, если чтение не удалось.
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   String get _greeting {
     final h = DateTime.now().hour;
-    if (h >= 6 && h < 12) return 'Доброе утро';
+    if (h >= 5 && h < 12) return 'Доброе утро';
     if (h >= 12 && h < 18) return 'Добрый день';
-    return 'Добрый вечер';
+    if (h >= 18 && h < 23) return 'Добрый вечер';
+    return 'Доброй ночи';
   }
 
   @override
@@ -154,7 +160,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
         const SizedBox(height: 10),
         _recentInvoicesSection(),
         const SizedBox(height: 24),
-        _sectionLabel('Материалы и обучение'),
+        _sectionLabel('Материалы и инструменты'),
         const SizedBox(height: 10),
         _resourceCards(),
       ]),

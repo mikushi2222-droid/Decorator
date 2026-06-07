@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../database.dart';
+import '../main.dart';
 import '../models.dart';
 import '../utils.dart';
 
@@ -135,8 +136,9 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
   // ── Вычисления ─────────────────────────────────────────────────────────────
 
   double get _subtotal =>
-      _items.fold(0, (s, i) => s + (double.tryParse(i.qtyC.text) ?? 0) * (double.tryParse(i.priceC.text) ?? 0));
-  double get _discountAmt => double.tryParse(_discountC.text) ?? 0;
+      _items.fold(0, (s, i) => s + (parseNum(i.qtyC.text) ?? 0) * (parseNum(i.priceC.text) ?? 0));
+  // Скидка не может быть отрицательной и не больше подытога.
+  double get _discountAmt => (parseNum(_discountC.text) ?? 0).clamp(0, _subtotal);
   double get _total => (_subtotal - _discountAmt).clamp(0, double.infinity);
 
   // ── Сохранение ─────────────────────────────────────────────────────────────
@@ -150,6 +152,20 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
       _showError('Заполните название во всех позициях');
       return;
     }
+    // Проверяем, что количество и цена — корректные неотрицательные числа.
+    for (var k = 0; k < _items.length; k++) {
+      final i = _items[k];
+      final qty = parseNum(i.qtyC.text);
+      final price = parseNum(i.priceC.text);
+      if (qty == null || qty <= 0) {
+        _showError('Позиция ${k + 1}: укажите количество больше нуля');
+        return;
+      }
+      if (price == null || price < 0) {
+        _showError('Позиция ${k + 1}: цена указана неверно');
+        return;
+      }
+    }
     setState(() => _saving = true);
     try {
       final db = AppDatabase.instance;
@@ -157,8 +173,8 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
         productId:   i.productId,
         productName: i.nameC.text.trim(),
         unit:        i.unitC.text.trim().isEmpty ? 'шт.' : i.unitC.text.trim(),
-        quantity:    double.tryParse(i.qtyC.text) ?? 1,
-        price:       double.tryParse(i.priceC.text) ?? 0,
+        quantity:    parseNum(i.qtyC.text) ?? 1,
+        price:       parseNum(i.priceC.text) ?? 0,
       )).toList();
 
       if (_isEdit) {
@@ -175,9 +191,7 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
         );
         await db.updateInvoice(updated);
       } else {
-        final seq    = await db.getLastInvoiceSeq();
-        final number = generateInvoiceNumber(seq);
-        final invoice = Invoice(
+        await db.createInvoiceWithNumber((number) => Invoice(
           number:        number,
           date:          _date,
           clientName:    _clientNameC.text.trim(),
@@ -190,8 +204,7 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
           status:        InvoiceStatus.draft,
           notes:         _notesC.text.trim(),
           createdAt:     DateTime.now(),
-        );
-        await db.insertInvoice(invoice);
+        ));
       }
 
       // Автосохранение клиента в базу
@@ -262,7 +275,7 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
                     final c = _clientSuggestions[i];
                     return ListTile(
                       dense: true,
-                      leading: const Icon(Icons.person, size: 18, color: Color(0xFF1E3A4A)),
+                      leading: const Icon(Icons.person, size: 18, color: kBronze),
                       title: Text(c.name, style: const TextStyle(fontSize: 13)),
                       subtitle: c.phone.isNotEmpty ? Text(c.phone, style: const TextStyle(fontSize: 11)) : null,
                       onTap: () => _selectClient(c),
@@ -376,7 +389,7 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
               const Text('К оплате:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               Text(formatCurrency(_total),
                   style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 20, color: Color(0xFF1E3A4A))),
+                      fontWeight: FontWeight.bold, fontSize: 20, color: kBronze)),
             ]),
           ]),
           const SizedBox(height: 12),
@@ -460,8 +473,8 @@ class _ItemRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final qty   = double.tryParse(entry.qtyC.text) ?? 0;
-    final price = double.tryParse(entry.priceC.text) ?? 0;
+    final qty   = parseNum(entry.qtyC.text) ?? 0;
+    final price = parseNum(entry.priceC.text) ?? 0;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(10),
@@ -526,7 +539,7 @@ class _ItemRow extends StatelessWidget {
           alignment: Alignment.centerRight,
           child: Text(
             'Сумма: ${(qty * price).toStringAsFixed(2)} ₽',
-            style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF1E3A4A), fontSize: 13),
+            style: const TextStyle(fontWeight: FontWeight.w600, color: kBronze, fontSize: 13),
           ),
         ),
       ]),

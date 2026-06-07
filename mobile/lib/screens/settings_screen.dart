@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import '../database.dart';
+import '../main.dart';
 import '../models.dart';
 import '../utils.dart';
 import 'onboarding_screen.dart';
@@ -37,8 +38,8 @@ class _SettingsScreenState extends State<SettingsScreen>
             Tab(icon: Icon(Icons.construction_outlined, size: 18), text: 'Работы'),
             Tab(icon: Icon(Icons.texture, size: 18), text: 'Примеры'),
           ],
-          labelColor: const Color(0xFF1E3A4A),
-          indicatorColor: const Color(0xFF1E3A4A),
+          labelColor: kBronze,
+          indicatorColor: kBronze,
         ),
         Expanded(
           child: TabBarView(
@@ -74,7 +75,16 @@ class _StoreSettingsTab extends StatefulWidget {
 class _StoreSettingsTabState extends State<_StoreSettingsTab> {
   StoreSettings? _settings;
   final _controllers = <String, TextEditingController>{};
+  final _decoratorNameC = TextEditingController();
+  String _businessType = 'ooo';
   bool _saved = false;
+
+  static const _businessTypes = [
+    ('ip', 'ИП'),
+    ('samozanyat', 'Самозанятый'),
+    ('ooo', 'ООО'),
+    ('fizlico', 'Физлицо'),
+  ];
 
   static const _fields = [
     ('name',            'Наименование организации',   false),
@@ -104,6 +114,8 @@ class _StoreSettingsTabState extends State<_StoreSettingsTab> {
     if (!mounted) return;
     setState(() {
       _settings = s;
+      _decoratorNameC.text                  = s.decoratorName;
+      _businessType                         = s.businessType.isEmpty ? 'ooo' : s.businessType;
       _controllers['name']!.text            = s.name;
       _controllers['address']!.text         = s.address;
       _controllers['phone']!.text           = s.phone;
@@ -123,6 +135,8 @@ class _StoreSettingsTabState extends State<_StoreSettingsTab> {
   Future<void> _save() async {
     final s = _settings ?? StoreSettings.defaults();
     final updated = s.copyWith(
+      decoratorName:   _decoratorNameC.text.trim(),
+      businessType:    _businessType,
       name:            _controllers['name']!.text,
       address:         _controllers['address']!.text,
       phone:           _controllers['phone']!.text,
@@ -149,6 +163,37 @@ class _StoreSettingsTabState extends State<_StoreSettingsTab> {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        // ── Профиль декоратора ──────────────────────────────────────────
+        const Text('Профиль декоратора',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: kBronze)),
+        const SizedBox(height: 10),
+        TextFormField(
+          controller: _decoratorNameC,
+          textCapitalization: TextCapitalization.words,
+          decoration: const InputDecoration(
+            labelText: 'Ваше имя',
+            hintText: 'Как к вам обращаться на главном экране',
+            prefixIcon: Icon(Icons.person_outline, size: 20),
+          ),
+        ),
+        const SizedBox(height: 10),
+        DropdownButtonFormField<String>(
+          value: _businessType,
+          decoration: const InputDecoration(
+            labelText: 'Тип деятельности',
+            prefixIcon: Icon(Icons.business_center_outlined, size: 20),
+          ),
+          items: _businessTypes
+              .map((t) => DropdownMenuItem(value: t.$1, child: Text(t.$2)))
+              .toList(),
+          onChanged: (v) => setState(() => _businessType = v ?? 'ooo'),
+        ),
+        const SizedBox(height: 18),
+        const Divider(),
+        const SizedBox(height: 12),
+        const Text('Реквизиты организации',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: kBronze)),
+        const SizedBox(height: 10),
         for (final f in _fields) ...[
           TextFormField(
             controller: _controllers[f.$1],
@@ -165,18 +210,21 @@ class _StoreSettingsTabState extends State<_StoreSettingsTab> {
         ),
         const SizedBox(height: 12),
         OutlinedButton.icon(
-          onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const OnboardingScreen(),
-              fullscreenDialog: true,
-            ),
-          ),
-          icon: const Icon(Icons.school_outlined, size: 18),
-          label: const Text('Посмотреть обучение'),
+          onPressed: () async {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const OnboardingScreen(),
+                fullscreenDialog: true,
+              ),
+            );
+            if (mounted) _load();
+          },
+          icon: const Icon(Icons.slideshow_outlined, size: 18),
+          label: const Text('Знакомство с приложением'),
           style: OutlinedButton.styleFrom(
-            foregroundColor: const Color(0xFF1E3A4A),
-            side: const BorderSide(color: Color(0xFF1E3A4A)),
+            foregroundColor: kBronze,
+            side: const BorderSide(color: kBronze),
             padding: const EdgeInsets.symmetric(vertical: 14),
           ),
         ),
@@ -187,6 +235,7 @@ class _StoreSettingsTabState extends State<_StoreSettingsTab> {
 
   @override
   void dispose() {
+    _decoratorNameC.dispose();
     for (final c in _controllers.values) c.dispose();
     super.dispose();
   }
@@ -418,7 +467,7 @@ class _ProductsTabState extends State<_ProductsTab> {
               onPressed: () => _showProductDialog(),
               icon: const Icon(Icons.add),
               tooltip: 'Добавить товар',
-              style: IconButton.styleFrom(backgroundColor: const Color(0xFF1E3A4A), foregroundColor: Colors.white),
+              style: IconButton.styleFrom(backgroundColor: kBronze, foregroundColor: Colors.white),
             ),
             const SizedBox(width: 4),
             PopupMenuButton<String>(
@@ -452,7 +501,7 @@ class _ProductsTabState extends State<_ProductsTab> {
                 label: Text(cat, style: const TextStyle(fontSize: 11)),
                 selected: active,
                 onSelected: (_) { setState(() => _activeCategory = cat); _search(); },
-                selectedColor: const Color(0xFF1E3A4A),
+                selectedColor: kBronze,
                 labelStyle: TextStyle(color: active ? Colors.white : null),
                 showCheckmark: false,
                 padding: const EdgeInsets.symmetric(horizontal: 2),
@@ -481,7 +530,7 @@ class _ProductsTabState extends State<_ProductsTab> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           IconButton(
-                            icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF1E3A4A)),
+                            icon: const Icon(Icons.edit_outlined, size: 18, color: kBronze),
                             onPressed: () => _showProductDialog(p),
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(),
@@ -611,7 +660,7 @@ class _LaborTabState extends State<_LaborTab> {
               icon: const Icon(Icons.add, size: 16),
               label: const Text('Добавить'),
               style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF1E3A4A),
+                backgroundColor: kBronze,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               ),
