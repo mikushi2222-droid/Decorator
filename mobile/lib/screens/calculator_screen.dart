@@ -18,7 +18,6 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
 
   bool _useDirectArea = false;
   Product? _selectedProduct;
-  double _packSize = 25;
   String _mode = 'both'; // 'both' | 'material' | 'labor'
 
   List<Product> _plasters = [];
@@ -31,12 +30,15 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   void initState() {
     super.initState();
     _load();
+    // Перезагружаем справочники, когда товары/ставки меняются в Настройках.
+    AppDatabase.instance.dataRevision.addListener(_load);
   }
 
   Future<void> _load() async {
     final db = AppDatabase.instance;
     final products = await db.getProducts();
     final rates = await db.getLaborRates();
+    if (!mounted) return;
     setState(() {
       _plasters = products.where((p) => p.coverage > 0).toList();
       _laborRates = rates;
@@ -61,23 +63,24 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
       return;
     }
 
-    double materialKg = 0, materialPacks = 0, materialCost = 0;
+    double materialKg = 0, materialCost = 0;
     if (_mode != 'labor' && _selectedProduct != null) {
       materialKg = area * _selectedProduct!.coverage;
-      materialPacks = (materialKg / _packSize).ceil().toDouble();
-      materialCost = materialPacks * _packSize * _selectedProduct!.price;
+      materialCost = materialKg * _selectedProduct!.price;
     }
 
-    final activeRates = _laborRates.where((r) => _selectedRates.contains(r.id)).toList();
+    // В режиме «только материал» ставки работ не учитываем — иначе в результате
+    // появлялись бы строки работ, не входящие в ИТОГО.
+    final activeRates = _mode != 'material'
+        ? _laborRates.where((r) => _selectedRates.contains(r.id)).toList()
+        : <LaborRate>[];
     final laborLines = activeRates.map((r) => _LaborLine(r.name, r.pricePerSqm * area)).toList();
-    final laborCost = _mode != 'material' ? laborLines.fold(0.0, (s, l) => s + l.cost) : 0.0;
+    final laborCost = laborLines.fold(0.0, (s, l) => s + l.cost);
 
     setState(() {
       _result = _CalcResult(
         area: area,
         materialKg: materialKg,
-        materialPacks: materialPacks.toInt(),
-        packSize: _packSize,
         materialCost: materialCost,
         laborLines: laborLines,
         laborCost: laborCost,
@@ -166,13 +169,6 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                   items: {null: '— Выберите штукатурку —', ...<Product, String>{for (final p in _plasters) p: '${p.name} (${p.coverage} кг/м²)'}},
                   onChanged: (v) => setState(() => _selectedProduct = v),
                 ),
-              const SizedBox(height: 8),
-              _dropdown<double>(
-                label: 'Фасовка упаковки',
-                value: _packSize,
-                items: {5.0: '5 кг', 10.0: '10 кг', 15.0: '15 кг', 25.0: '25 кг', 30.0: '30 кг'},
-                onChanged: (v) => setState(() => _packSize = v!),
-              ),
             ]),
             const SizedBox(height: 12),
           ],
@@ -328,6 +324,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
 
   @override
   void dispose() {
+    AppDatabase.instance.dataRevision.removeListener(_load);
     _lengthC.dispose(); _widthC.dispose(); _heightC.dispose(); _areaC.dispose();
     super.dispose();
   }
@@ -342,16 +339,13 @@ class _LaborLine {
 class _CalcResult {
   final double area;
   final double materialKg;
-  final int materialPacks;
-  final double packSize;
   final double materialCost;
   final List<_LaborLine> laborLines;
   final double laborCost;
   final double total;
   _CalcResult({
-    required this.area, required this.materialKg, required this.materialPacks,
-    required this.packSize, required this.materialCost, required this.laborLines,
-    required this.laborCost, required this.total,
+    required this.area, required this.materialKg, required this.materialCost,
+    required this.laborLines, required this.laborCost, required this.total,
   });
 }
 
@@ -380,7 +374,6 @@ class _ResultCard extends StatelessWidget {
           _row('Площадь', '${formatNumber(result.area)} м²'),
           if (result.materialKg > 0) ...[
             _row('Потребность', '${formatNumber(result.materialKg)} кг'),
-            _row('Упаковок по ${result.packSize.toInt()} кг', '${result.materialPacks} шт.'),
             _row('Стоимость материала', formatCurrency(result.materialCost)),
           ],
           ...result.laborLines.map((l) => _row(l.name, formatCurrency(l.cost))),

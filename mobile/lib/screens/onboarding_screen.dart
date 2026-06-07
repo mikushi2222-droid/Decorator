@@ -38,7 +38,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     _CardData(
       icon: Icons.inventory_2_outlined,
       label: 'Шаг 3',
-      title: 'Каталог · 552 позиции',
+      title: 'Каталог · 550+ позиций',
       body:
           'Полный прайс-лист РРЦ:\nKIITOS · OLSTA · DECORAZZA · BAYRAMIX · PRORAB · ECOTINT · Инструменты.\n\nПоиск по названию, фильтр по брендам.',
     ),

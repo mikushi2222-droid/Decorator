@@ -1,5 +1,11 @@
-import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'dart:io';
 import 'dart:math' as math;
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
+import '../database.dart';
 
 // ─── Data model ───────────────────────────────────────────────────────────────
 
@@ -25,7 +31,24 @@ extension TextureGroupX on TextureGroup {
 
 enum TexturePattern { silk, velvet, suede, marmorin, venetian, travertine, sand, relief, base }
 
+extension TexturePatternX on TexturePattern {
+  String get label {
+    switch (this) {
+      case TexturePattern.silk:       return 'Шёлк (диагональный блеск)';
+      case TexturePattern.velvet:     return 'Велюр (мягкие точки)';
+      case TexturePattern.suede:      return 'Замша (мелкое зерно)';
+      case TexturePattern.marmorin:   return 'Мармарин (прожилки + перламутр)';
+      case TexturePattern.venetian:   return 'Венецианская (глянец + прожилки)';
+      case TexturePattern.travertine: return 'Травертин (полосы + поры)';
+      case TexturePattern.sand:       return 'Песок (зерно)';
+      case TexturePattern.relief:     return 'Барельеф (объёмный цветок)';
+      case TexturePattern.base:       return 'Гладкая (градиент)';
+    }
+  }
+}
+
 class TextureSample {
+  final int? id;
   final String name;
   final TextureGroup group;
   final List<Color> gradient;
@@ -36,8 +59,11 @@ class TextureSample {
   final String priceRange;
   final List<String> products;
   final TexturePattern pattern;
+  final int sortOrder;
+  final String imagePath;
 
   const TextureSample({
+    this.id,
     required this.name,
     required this.group,
     required this.gradient,
@@ -48,10 +74,102 @@ class TextureSample {
     required this.priceRange,
     required this.products,
     required this.pattern,
+    this.sortOrder = 0,
+    this.imagePath = '',
   });
+
+  Map<String, Object?> toMap() => {
+        'id': id,
+        'name': name,
+        'grp': group.name,
+        'pattern': pattern.name,
+        'gradient': jsonEncode(gradient.map((c) => c.value).toList()),
+        'description': description,
+        'effect': effect,
+        'sheen': sheenLevel,
+        'difficulty': difficulty,
+        'price_range': priceRange,
+        'products': jsonEncode(products),
+        'sort_order': sortOrder,
+        'image_path': imagePath,
+      };
+
+  factory TextureSample.fromMap(Map<String, Object?> m) {
+    final grad = (jsonDecode((m['gradient'] as String?) ?? '[]') as List)
+        .map((v) => Color(v as int))
+        .toList();
+    return TextureSample(
+      id: m['id'] as int?,
+      name: (m['name'] as String?) ?? '',
+      group: TextureGroup.values
+          .asNameMap()[m['grp'] as String?] ?? TextureGroup.liquid,
+      pattern: TexturePattern.values
+          .asNameMap()[m['pattern'] as String?] ?? TexturePattern.base,
+      gradient: grad.length >= 2
+          ? grad
+          : const [Color(0xFFEAE0D0), Color(0xFFCCC0A8), Color(0xFFA89878)],
+      description: (m['description'] as String?) ?? '',
+      effect: (m['effect'] as String?) ?? '',
+      sheenLevel: (m['sheen'] as int?) ?? 0,
+      difficulty: (m['difficulty'] as int?) ?? 1,
+      priceRange: (m['price_range'] as String?) ?? '',
+      products:
+          ((jsonDecode((m['products'] as String?) ?? '[]') as List).cast<String>()),
+      sortOrder: (m['sort_order'] as int?) ?? 0,
+      imagePath: (m['image_path'] as String?) ?? '',
+    );
+  }
+
+  TextureSample copyWith({
+    int? id,
+    String? name,
+    TextureGroup? group,
+    List<Color>? gradient,
+    String? description,
+    String? effect,
+    int? sheenLevel,
+    int? difficulty,
+    String? priceRange,
+    List<String>? products,
+    TexturePattern? pattern,
+    int? sortOrder,
+    String? imagePath,
+  }) =>
+      TextureSample(
+        id: id ?? this.id,
+        name: name ?? this.name,
+        group: group ?? this.group,
+        gradient: gradient ?? this.gradient,
+        description: description ?? this.description,
+        effect: effect ?? this.effect,
+        sheenLevel: sheenLevel ?? this.sheenLevel,
+        difficulty: difficulty ?? this.difficulty,
+        priceRange: priceRange ?? this.priceRange,
+        products: products ?? this.products,
+        pattern: pattern ?? this.pattern,
+        sortOrder: sortOrder ?? this.sortOrder,
+        imagePath: imagePath ?? this.imagePath,
+      );
 }
 
-const _samples = [
+// Палитры-пресеты для редактора (без RGB-пипетки, чтобы было просто и офлайн).
+const Map<String, List<Color>> _palettes = {
+  'Песочный':      [Color(0xFFF5EDD8), Color(0xFFD9C9A8), Color(0xFFBDAD8A)],
+  'Тёмный велюр':  [Color(0xFF7A5248), Color(0xFF4E3028), Color(0xFF2E1C18)],
+  'Замша':         [Color(0xFFCCAA80), Color(0xFFA88860), Color(0xFF7A6040)],
+  'Жемчуг':        [Color(0xFFEAE0D0), Color(0xFFCCC0A8), Color(0xFFA89878)],
+  'Белый мрамор':  [Color(0xFFF8F4EC), Color(0xFFE0D8C4), Color(0xFFC4BAA4)],
+  'Травертин':     [Color(0xFFE8D8B0), Color(0xFFD0BF94), Color(0xFFB8A870)],
+  'Тёплый песок':  [Color(0xFFE0D0A8), Color(0xFFCCC090), Color(0xFFB0A870)],
+  'Серый камень':  [Color(0xFFE0E0E0), Color(0xFFBEBEBE), Color(0xFF9A9A9A)],
+  'Графит':        [Color(0xFF6B6E72), Color(0xFF45484C), Color(0xFF2A2C2E)],
+  'Изумруд':       [Color(0xFFBFD8C4), Color(0xFF7FA98C), Color(0xFF4A7059)],
+  'Терракота':     [Color(0xFFD9A88A), Color(0xFFB87856), Color(0xFF8A5438)],
+  'Лазурь':        [Color(0xFFBCD3DE), Color(0xFF87AEC0), Color(0xFF577E92)],
+};
+
+// Стартовый набор — засевается в БД при первом запуске.
+const _defaultSamples = <TextureSample>[
   TextureSample(
     name: 'Шёлк',
     group: TextureGroup.liquid,
@@ -161,51 +279,264 @@ class SamplesScreen extends StatefulWidget {
 
 class _SamplesScreenState extends State<SamplesScreen> {
   TextureGroup? _filter;
+  List<TextureSample> _samples = [];
+  bool _loading = true;
+  bool _sortMode = false;
+  final _searchC = TextEditingController();
 
-  List<TextureSample> get _visible =>
-      _filter == null ? _samples : _samples.where((s) => s.group == _filter).toList();
+  @override
+  void initState() {
+    super.initState();
+    _load();
+    _searchC.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _searchC.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    final db = AppDatabase.instance;
+    // Засеять стартовые примеры при первом запуске.
+    if (await db.textureSamplesCount() == 0) {
+      for (var i = 0; i < _defaultSamples.length; i++) {
+        await db.insertTextureSample(_defaultSamples[i].copyWith(sortOrder: i).toMap());
+      }
+    }
+    final rows = await db.getTextureSamples();
+    if (!mounted) return;
+    setState(() {
+      _samples = rows.map(TextureSample.fromMap).toList();
+      _loading = false;
+    });
+  }
+
+  List<TextureSample> get _visible {
+    final q = _searchC.text.trim().toLowerCase();
+    return _samples.where((s) {
+      final matchGroup = _filter == null || s.group == _filter;
+      final matchSearch = q.isEmpty ||
+          s.name.toLowerCase().contains(q) ||
+          s.effect.toLowerCase().contains(q) ||
+          s.description.toLowerCase().contains(q);
+      return matchGroup && matchSearch;
+    }).toList();
+  }
+
+  Future<void> _reorder(int oldIndex, int newIndex) async {
+    if (newIndex > oldIndex) newIndex--;
+    final list = _visible.toList();
+    final moved = list.removeAt(oldIndex);
+    list.insert(newIndex, moved);
+    // Rebuild full _samples with updated order
+    final visible = list.map((s) => s.id).toSet();
+    final others = _samples.where((s) => !visible.contains(s.id)).toList();
+    final reordered = [...list, ...others];
+    setState(() => _samples = reordered);
+    // Persist sort_order
+    for (var i = 0; i < reordered.length; i++) {
+      final s = reordered[i];
+      if (s.id != null) {
+        await AppDatabase.instance.updateTextureSample(
+            s.id!, s.copyWith(sortOrder: i).toMap());
+      }
+    }
+  }
+
+  Future<void> _addNew() async {
+    final saved = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => const SampleEditScreen()),
+    );
+    if (saved == true) _load();
+  }
+
+  Future<void> _openDetail(TextureSample sample) async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _DetailSheet(sample: sample),
+    );
+    if (!mounted) return;
+    if (action == 'edit') {
+      final saved = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(builder: (_) => SampleEditScreen(sample: sample)),
+      );
+      if (saved == true) _load();
+    } else if (action == 'delete') {
+      await _confirmDelete(sample);
+    }
+  }
+
+  Future<void> _confirmDelete(TextureSample sample) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Удалить пример?'),
+        content: Text(sample.name),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Отмена')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Удалить', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    if (ok == true && sample.id != null) {
+      await AppDatabase.instance.deleteTextureSample(sample.id!);
+      _load();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    final visible = _visible;
     return Column(
       children: [
+        // Header row
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
+          child: Row(children: [
+            const Expanded(
+              child: Text('Примеры покрытий',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            ),
+            IconButton(
+              tooltip: _sortMode ? 'Готово' : 'Сортировать',
+              icon: Icon(_sortMode ? Icons.check_circle_outline : Icons.swap_vert,
+                  color: _sortMode ? Colors.green : null),
+              onPressed: () => setState(() => _sortMode = !_sortMode),
+            ),
+            FilledButton.icon(
+              onPressed: _addNew,
+              icon: const Icon(Icons.add, size: 16),
+              label: const Text('Добавить'),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF1E3A4A),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              ),
+            ),
+          ]),
+        ),
+
+        // Search bar
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+          child: TextField(
+            controller: _searchC,
+            decoration: InputDecoration(
+              hintText: 'Поиск по фактурам…',
+              prefixIcon: const Icon(Icons.search, size: 18),
+              suffixIcon: _searchC.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, size: 16),
+                      onPressed: _searchC.clear,
+                    )
+                  : null,
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+            ),
+          ),
+        ),
+
         // Group filter chips
         SizedBox(
-          height: 48,
+          height: 40,
           child: ListView(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             children: [
               _chip('Все', _filter == null, () => setState(() => _filter = null)),
               const SizedBox(width: 6),
               ...TextureGroup.values.map((g) => Padding(
                     padding: const EdgeInsets.only(right: 6),
-                    child: _chip(g.label, _filter == g, () => setState(() => _filter = g), color: g.color),
+                    child: _chip(g.label, _filter == g,
+                        () => setState(() => _filter = g), color: g.color),
                   )),
             ],
           ),
         ),
 
-        // Grid
-        Expanded(
-          child: GridView.builder(
-            padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              mainAxisSpacing: 10,
-              crossAxisSpacing: 10,
-              childAspectRatio: 0.75,
-            ),
-            itemCount: _visible.length,
-            itemBuilder: (_, i) => _SampleCard(
-              sample: _visible[i],
-              onTap: () => _showDetail(context, _visible[i]),
-            ),
+        if (_sortMode)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+            child: Text('Удерживайте и перетащите для изменения порядка',
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
           ),
+
+        // Content
+        Expanded(
+          child: visible.isEmpty
+              ? Center(
+                  child: Text(
+                    _searchC.text.isNotEmpty
+                        ? 'Ничего не найдено'
+                        : 'Примеров пока нет. Нажмите «Добавить».',
+                    style: const TextStyle(color: Colors.grey),
+                  ),
+                )
+              : _sortMode
+                  ? _buildSortList(visible)
+                  : _buildGrid(visible),
         ),
       ],
     );
   }
+
+  Widget _buildGrid(List<TextureSample> items) => GridView.builder(
+        padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          mainAxisSpacing: 10,
+          crossAxisSpacing: 10,
+          childAspectRatio: 0.75,
+        ),
+        itemCount: items.length,
+        itemBuilder: (_, i) => _SampleCard(
+          sample: items[i],
+          onTap: () => _openDetail(items[i]),
+        ),
+      );
+
+  Widget _buildSortList(List<TextureSample> items) => ReorderableListView.builder(
+        padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
+        onReorder: _reorder,
+        itemCount: items.length,
+        itemBuilder: (_, i) {
+          final s = items[i];
+          final hasImg = s.imagePath.isNotEmpty && File(s.imagePath).existsSync();
+          return Card(
+            key: ValueKey(s.id ?? i),
+            margin: const EdgeInsets.only(bottom: 6),
+            child: ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              leading: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: SizedBox(
+                  width: 52, height: 52,
+                  child: hasImg
+                      ? Image.file(File(s.imagePath), fit: BoxFit.cover)
+                      : CustomPaint(painter: _TexturePainter(s.pattern, s.gradient)),
+                ),
+              ),
+              title: Text(s.name,
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+              subtitle: Text(s.effect,
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+              trailing: const Icon(Icons.drag_handle, color: Colors.grey),
+            ),
+          );
+        },
+      );
 
   Widget _chip(String label, bool active, VoidCallback onTap, {Color? color}) {
     final c = color ?? const Color(0xFF1E3A4A);
@@ -228,15 +559,6 @@ class _SamplesScreenState extends State<SamplesScreen> {
           ),
         ),
       ),
-    );
-  }
-
-  void _showDetail(BuildContext context, TextureSample sample) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _DetailSheet(sample: sample),
     );
   }
 }
@@ -264,21 +586,25 @@ class _SampleCard extends StatelessWidget {
               // Texture preview (60% of card)
               Expanded(
                 flex: 6,
-                child: CustomPaint(
-                  painter: _TexturePainter(sample.pattern, sample.gradient),
-                  child: Align(
-                    alignment: Alignment.topRight,
-                    child: Container(
-                      margin: const EdgeInsets.all(8),
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: sample.group.color.withOpacity(0.85),
-                        borderRadius: BorderRadius.circular(12),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    _hasImage(sample)
+                        ? Image.file(File(sample.imagePath), fit: BoxFit.cover)
+                        : CustomPaint(painter: _TexturePainter(sample.pattern, sample.gradient)),
+                    Positioned(
+                      top: 8, right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: sample.group.color.withOpacity(0.85),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(sample.group.label,
+                            style: const TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.w600)),
                       ),
-                      child: Text(sample.group.label,
-                          style: const TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.w600)),
                     ),
-                  ),
+                  ],
                 ),
               ),
               // Info (40% of card)
@@ -321,6 +647,9 @@ class _SampleCard extends StatelessWidget {
     );
   }
 
+  bool _hasImage(TextureSample s) =>
+      s.imagePath.isNotEmpty && File(s.imagePath).existsSync();
+
   List<Widget> _sheenDots(int level) {
     return List.generate(3, (i) => Container(
           width: 6, height: 6,
@@ -355,10 +684,16 @@ class _DetailSheet extends StatelessWidget {
   final TextureSample sample;
   const _DetailSheet({required this.sample});
 
+  File? get _imageFile {
+    if (sample.imagePath.isEmpty) return null;
+    final f = File(sample.imagePath);
+    return f.existsSync() ? f : null;
+  }
+
   @override
   Widget build(BuildContext context) {
     return DraggableScrollableSheet(
-      initialChildSize: 0.75,
+      initialChildSize: 0.78,
       minChildSize: 0.5,
       maxChildSize: 0.95,
       builder: (_, sc) => Container(
@@ -382,7 +717,9 @@ class _DetailSheet extends StatelessWidget {
             // Large texture preview
             SizedBox(
               height: 220,
-              child: CustomPaint(painter: _TexturePainter(sample.pattern, sample.gradient)),
+              child: _imageFile != null
+                  ? Image.file(_imageFile!, fit: BoxFit.cover, width: double.infinity)
+                  : CustomPaint(painter: _TexturePainter(sample.pattern, sample.gradient)),
             ),
 
             Padding(
@@ -412,27 +749,61 @@ class _DetailSheet extends StatelessWidget {
                     ),
                   ]),
                   const SizedBox(height: 16),
-                  Text(sample.description, style: const TextStyle(fontSize: 14, height: 1.5)),
-                  const SizedBox(height: 20),
+                  if (sample.description.isNotEmpty) ...[
+                    Text(sample.description, style: const TextStyle(fontSize: 14, height: 1.5)),
+                    const SizedBox(height: 20),
+                  ],
 
                   // Characteristics
-                  _infoRow('Цена работ', sample.priceRange, Icons.payments_outlined),
-                  _infoRow('Эффект', sample.effect, Icons.auto_awesome_outlined),
+                  if (sample.priceRange.isNotEmpty)
+                    _infoRow('Цена работ', sample.priceRange, Icons.payments_outlined),
+                  if (sample.effect.isNotEmpty)
+                    _infoRow('Эффект', sample.effect, Icons.auto_awesome_outlined),
                   _infoRow('Блеск', _sheenLabel(sample.sheenLevel), Icons.wb_sunny_outlined),
                   _infoRow('Сложность', _diffLabel(sample.difficulty), Icons.bar_chart),
                   const SizedBox(height: 16),
 
                   // Products
-                  Text('Материалы', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey.shade600)),
-                  const SizedBox(height: 6),
-                  ...sample.products.map((p) => Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
-                        child: Row(children: [
-                          Icon(Icons.circle, size: 5, color: Colors.grey.shade400),
-                          const SizedBox(width: 8),
-                          Text(p, style: const TextStyle(fontSize: 13)),
-                        ]),
-                      )),
+                  if (sample.products.isNotEmpty) ...[
+                    Text('Материалы', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey.shade600)),
+                    const SizedBox(height: 6),
+                    ...sample.products.map((p) => Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: Row(children: [
+                            Icon(Icons.circle, size: 5, color: Colors.grey.shade400),
+                            const SizedBox(width: 8),
+                            Expanded(child: Text(p, style: const TextStyle(fontSize: 13))),
+                          ]),
+                        )),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // Actions
+                  Row(children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => Navigator.pop(context, 'edit'),
+                        icon: const Icon(Icons.edit_outlined, size: 18),
+                        label: const Text('Редактировать'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF1E3A4A),
+                          side: const BorderSide(color: Color(0xFF1E3A4A)),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    OutlinedButton.icon(
+                      onPressed: () => Navigator.pop(context, 'delete'),
+                      icon: const Icon(Icons.delete_outline, size: 18),
+                      label: const Text('Удалить'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.red,
+                        side: const BorderSide(color: Colors.red),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      ),
+                    ),
+                  ]),
                 ],
               ),
             ),
@@ -472,6 +843,345 @@ class _DetailSheet extends StatelessWidget {
   }
 }
 
+// ─── Add / edit screen ──────────────────────────────────────────────────────────
+
+class SampleEditScreen extends StatefulWidget {
+  final TextureSample? sample;
+  const SampleEditScreen({super.key, this.sample});
+
+  @override
+  State<SampleEditScreen> createState() => _SampleEditScreenState();
+}
+
+class _SampleEditScreenState extends State<SampleEditScreen> {
+  late final TextEditingController _nameC;
+  late final TextEditingController _effectC;
+  late final TextEditingController _descC;
+  late final TextEditingController _priceC;
+  late final TextEditingController _productsC;
+
+  late TextureGroup _group;
+  late TexturePattern _pattern;
+  late List<Color> _gradient;
+  late int _sheen;
+  late int _difficulty;
+  late String _imagePath;
+  bool _saving = false;
+
+  bool get _isEdit => widget.sample != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final s = widget.sample;
+    _nameC = TextEditingController(text: s?.name ?? '');
+    _effectC = TextEditingController(text: s?.effect ?? '');
+    _descC = TextEditingController(text: s?.description ?? '');
+    _priceC = TextEditingController(text: s?.priceRange ?? '');
+    _productsC = TextEditingController(text: (s?.products ?? const []).join('\n'));
+    _group = s?.group ?? TextureGroup.liquid;
+    _pattern = s?.pattern ?? TexturePattern.base;
+    _gradient = s?.gradient ?? _palettes.values.first;
+    _sheen = s?.sheenLevel ?? 0;
+    _difficulty = s?.difficulty ?? 1;
+    _imagePath = s?.imagePath ?? '';
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(source: source, imageQuality: 85, maxWidth: 1200);
+    if (picked == null) return;
+    final dir = await getApplicationDocumentsDirectory();
+    final imgDir = Directory(p.join(dir.path, 'texture_images'));
+    await imgDir.create(recursive: true);
+    final fileName = 'texture_${DateTime.now().millisecondsSinceEpoch}.jpg';
+    final dest = p.join(imgDir.path, fileName);
+    await File(picked.path).copy(dest);
+    setState(() => _imagePath = dest);
+  }
+
+  void _removeImage() => setState(() => _imagePath = '');
+
+  @override
+  void dispose() {
+    _nameC.dispose();
+    _effectC.dispose();
+    _descC.dispose();
+    _priceC.dispose();
+    _productsC.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (_nameC.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Укажите название')),
+      );
+      return;
+    }
+    setState(() => _saving = true);
+    final products = _productsC.text
+        .split('\n')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+    final model = (widget.sample ??
+            const TextureSample(
+              name: '', group: TextureGroup.liquid, gradient: [],
+              description: '', effect: '', sheenLevel: 0, difficulty: 1,
+              priceRange: '', products: [], pattern: TexturePattern.base,
+            ))
+        .copyWith(
+      name: _nameC.text.trim(),
+      effect: _effectC.text.trim(),
+      description: _descC.text.trim(),
+      priceRange: _priceC.text.trim(),
+      products: products,
+      group: _group,
+      pattern: _pattern,
+      gradient: _gradient,
+      sheenLevel: _sheen,
+      difficulty: _difficulty,
+      imagePath: _imagePath,
+    );
+    final db = AppDatabase.instance;
+    if (_isEdit && widget.sample!.id != null) {
+      await db.updateTextureSample(widget.sample!.id!, model.toMap());
+    } else {
+      await db.insertTextureSample(model.toMap());
+    }
+    if (!mounted) return;
+    Navigator.pop(context, true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(_isEdit ? 'Редактировать пример' : 'Новый пример'),
+        actions: [
+          TextButton(
+            onPressed: _saving ? null : _save,
+            child: _saving
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                : const Text('Сохранить', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          // Photo / live preview
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: SizedBox(
+              height: 160,
+              width: double.infinity,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  _imagePath.isNotEmpty && File(_imagePath).existsSync()
+                      ? Image.file(File(_imagePath), fit: BoxFit.cover)
+                      : CustomPaint(painter: _TexturePainter(_pattern, _gradient)),
+                  // Overlay buttons
+                  Positioned(
+                    bottom: 8, right: 8,
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      if (_imagePath.isNotEmpty) ...[
+                        _overlayBtn(Icons.delete_outline, Colors.red, _removeImage),
+                        const SizedBox(width: 6),
+                      ],
+                      // Camera only available on mobile
+                      if (Platform.isAndroid || Platform.isIOS) ...[
+                        _overlayBtn(Icons.camera_alt_outlined, Colors.white,
+                            () => _pickImage(ImageSource.camera)),
+                        const SizedBox(width: 6),
+                      ],
+                      _overlayBtn(Icons.photo_library_outlined, Colors.white,
+                          () => _pickImage(ImageSource.gallery)),
+                    ]),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text('Фото заменяет нарисованную фактуру в карточке.',
+              style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+          const SizedBox(height: 12),
+
+          _label('Название'),
+          TextFormField(controller: _nameC, decoration: const InputDecoration(hintText: 'Например: Шёлк')),
+          const SizedBox(height: 12),
+
+          _label('Эффект (подзаголовок)'),
+          TextFormField(controller: _effectC, decoration: const InputDecoration(hintText: 'Например: Шёлк / Перламутр')),
+          const SizedBox(height: 12),
+
+          _label('Группа'),
+          DropdownButtonFormField<TextureGroup>(
+            value: _group,
+            isExpanded: true,
+            items: TextureGroup.values
+                .map((g) => DropdownMenuItem(value: g, child: Text(g.label)))
+                .toList(),
+            onChanged: (v) => setState(() => _group = v!),
+          ),
+          const SizedBox(height: 12),
+
+          _label('Фактура (как рисуется)'),
+          DropdownButtonFormField<TexturePattern>(
+            value: _pattern,
+            isExpanded: true,
+            items: TexturePattern.values
+                .map((p) => DropdownMenuItem(value: p, child: Text(p.label, overflow: TextOverflow.ellipsis)))
+                .toList(),
+            onChanged: (v) => setState(() => _pattern = v!),
+          ),
+          const SizedBox(height: 12),
+
+          _label('Палитра'),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _palettes.entries.map((e) {
+              final selected = _sameColors(e.value, _gradient);
+              return GestureDetector(
+                onTap: () => setState(() => _gradient = e.value),
+                child: Container(
+                  width: 64,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(colors: e.value),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: selected ? const Color(0xFF1E3A4A) : Colors.grey.shade300,
+                      width: selected ? 2.5 : 1,
+                    ),
+                  ),
+                  child: selected
+                      ? const Icon(Icons.check, color: Colors.white, size: 18)
+                      : null,
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 16),
+
+          _label('Блеск'),
+          _segments(
+            count: 4,
+            startAt: 0,
+            value: _sheen,
+            labels: const ['Матовый', 'Полумат.', 'Сатин', 'Глянец'],
+            onChanged: (v) => setState(() => _sheen = v),
+          ),
+          const SizedBox(height: 16),
+
+          _label('Сложность'),
+          _segments(
+            count: 5,
+            startAt: 1,
+            value: _difficulty,
+            labels: const ['1★', '2★', '3★', '4★', '5★'],
+            onChanged: (v) => setState(() => _difficulty = v),
+          ),
+          const SizedBox(height: 16),
+
+          _label('Цена работ (текст)'),
+          TextFormField(controller: _priceC, decoration: const InputDecoration(hintText: 'Например: 700 – 1 600 ₽/м²')),
+          const SizedBox(height: 12),
+
+          _label('Материалы (по одному в строке)'),
+          TextFormField(
+            controller: _productsC,
+            maxLines: 4,
+            decoration: const InputDecoration(
+              hintText: 'DECORAZZA Seta da Vinci\nDECORAZZA Aretino',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          _label('Описание'),
+          TextFormField(
+            controller: _descC,
+            maxLines: 4,
+            decoration: const InputDecoration(
+              hintText: 'Краткое описание фактуры и техники нанесения…',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  bool _sameColors(List<Color> a, List<Color> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
+  Widget _overlayBtn(IconData icon, Color color, VoidCallback onTap) =>
+      GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(7),
+          decoration: BoxDecoration(
+            color: Colors.black54,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, size: 18, color: color),
+        ),
+      );
+
+  Widget _label(String text) => Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child: Text(text, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade700)),
+      );
+
+  Widget _segments({
+    required int count,
+    required int startAt,
+    required int value,
+    required List<String> labels,
+    required ValueChanged<int> onChanged,
+  }) {
+    return Row(
+      children: List.generate(count, (i) {
+        final v = startAt + i;
+        final active = v == value;
+        return Expanded(
+          child: GestureDetector(
+            onTap: () => onChanged(v),
+            child: Container(
+              margin: EdgeInsets.only(right: i == count - 1 ? 0 : 6),
+              padding: const EdgeInsets.symmetric(vertical: 9),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: active ? const Color(0xFF1E3A4A) : Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                labels[i],
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: active ? Colors.white : Colors.black87,
+                ),
+              ),
+            ),
+          ),
+        );
+      }),
+    );
+  }
+}
+
 // ─── Texture painters ─────────────────────────────────────────────────────────
 
 class _TexturePainter extends CustomPainter {
@@ -483,7 +1193,7 @@ class _TexturePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final rect = Offset.zero & size;
 
-    // Base gradient
+    // Base gradient (минимум 2 цвета гарантируется моделью)
     canvas.drawRect(
       rect,
       Paint()
@@ -714,7 +1424,7 @@ class _TexturePainter extends CustomPainter {
     final highlightPaint = Paint()
       ..color = Colors.white.withOpacity(0.35);
     final basePaint = Paint()
-      ..color = gradient[1].withOpacity(0.9);
+      ..color = gradient[gradient.length > 1 ? 1 : 0].withOpacity(0.9);
 
     // Draw petal shapes
     for (int p = 0; p < 6; p++) {

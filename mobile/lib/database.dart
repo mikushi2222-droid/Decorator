@@ -1,12 +1,22 @@
 import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 import 'models.dart';
 
 class AppDatabase {
   static final AppDatabase instance = AppDatabase._();
   static Database? _db;
+
+  /// Версия справочников (товары + ставки работ). Увеличивается при любом
+  /// изменении каталога или работ. Экраны Калькулятора и Каталога слушают её,
+  /// чтобы перезагрузить данные — иначе из-за IndexedStack они показывали бы
+  /// устаревший список до перезапуска приложения.
+  final ValueNotifier<int> dataRevision = ValueNotifier<int>(0);
+  void _bumpRevision() => dataRevision.value++;
 
   AppDatabase._();
 
@@ -16,10 +26,18 @@ class AppDatabase {
   }
 
   Future<Database> _open() async {
-    final path = join(await getDatabasesPath(), 'decorator.db');
+    final String path;
+    final desktop = !kIsWeb &&
+        (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
+    if (desktop) {
+      final dir = await getApplicationSupportDirectory();
+      path = join(dir.path, 'decorator.db');
+    } else {
+      path = join(await getDatabasesPath(), 'decorator.db');
+    }
     return openDatabase(
       path,
-      version: 5,
+      version: 7,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -41,48 +59,79 @@ class AppDatabase {
       );
     }
     if (oldVersion < 4) {
-      // Заменить старые 5 видов работ на 11 реальных
-      await db.execute('DELETE FROM labor_rates');
-      await _seedLaborRates(db);
-
-      // Добавить отсутствующие декоративные штукатурки в калькулятор
+      // Добавить отсутствующие декоративные штукатурки в калькулятор.
+      // Дедупликация по имени: на части установок (миграция с v1) они уже
+      // могли быть добавлены свежим _seedProducts.
+      final existing = (await db.query('products', columns: ['name']))
+          .map((r) => r['name'] as String)
+          .toSet();
       for (final p in _additionalPlasters()) {
-        await db.insert('products', p);
+        if (!existing.contains(p['name'])) {
+          await db.insert('products', p);
+        }
       }
     }
     if (oldVersion < 5) {
-      // Добавить колонки рыночных цен
-      await db.execute('ALTER TABLE labor_rates ADD COLUMN market_min REAL NOT NULL DEFAULT 0');
-      await db.execute('ALTER TABLE labor_rates ADD COLUMN market_median REAL NOT NULL DEFAULT 0');
-      await db.execute('ALTER TABLE labor_rates ADD COLUMN market_max REAL NOT NULL DEFAULT 0');
-
-      // Обновить цены до верхней границы рынка + заполнить диапазоны
-      final marketData = {
-        '1-й слой декоративной штукатурки (база)': [150.0, 280.0, 450.0],
-        '2-й слой декоративной штукатурки (слой)': [300.0, 450.0, 650.0],
-        '3-й слой декоративной штукатурки (слой)': [250.0, 400.0, 600.0],
-        'Шёлк':      [700.0,  1100.0, 1600.0],
-        'Велюр':     [700.0,  1100.0, 1600.0],
-        'Замша':     [900.0,  1350.0, 1800.0],
-        'Песок':     [400.0,   650.0,  900.0],
-        'Травертин': [1000.0, 1400.0, 1800.0],
-        'Мармарин':  [1500.0, 2200.0, 3000.0],
-        'Барельеф':  [5000.0, 8500.0, 15000.0],
-        'Мрамор (венецианская)': [2500.0, 3800.0, 5000.0],
-      };
-      for (final entry in marketData.entries) {
-        final min = entry.value[0];
-        final median = entry.value[1];
-        final max = entry.value[2];
-        await db.execute(
-          'UPDATE labor_rates SET price_per_sqm = ?, market_min = ?, market_median = ?, market_max = ? WHERE name = ?',
-          [max, min, median, max, entry.key],
-        );
+      // Добавить колонки рыночных цен (идемпотентно).
+      for (final col in const ['market_min', 'market_median', 'market_max']) {
+        try {
+          await db.execute('ALTER TABLE labor_rates ADD COLUMN $col REAL NOT NULL DEFAULT 0');
+        } catch (_) {
+          // колонка уже существует
+        }
       }
+      // Обновить стандартные ставки по имени (цены до верха рынка + диапазоны),
+      // НЕ трогая пользовательские ставки. Если стандартной ставки нет — добавить.
+      for (final r in _standardLaborRates()) {
+        final updated = await db.update(
+          'labor_rates',
+          {
+            'price_per_sqm': r['price_per_sqm'],
+            'market_min': r['market_min'],
+            'market_median': r['market_median'],
+            'market_max': r['market_max'],
+          },
+          where: 'name = ?',
+          whereArgs: [r['name']],
+        );
+        if (updated == 0) {
+          await db.insert('labor_rates', r);
+        }
+      }
+    }
+    if (oldVersion < 6) {
+      await _createTextureSamplesTable(db);
+    }
+    if (oldVersion < 7) {
+      try {
+        await db.execute(
+            'ALTER TABLE texture_samples ADD COLUMN image_path TEXT NOT NULL DEFAULT \'\'');
+      } catch (_) {}
     }
   }
 
+  Future<void> _createTextureSamplesTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS texture_samples (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        grp TEXT NOT NULL,
+        pattern TEXT NOT NULL,
+        gradient TEXT NOT NULL DEFAULT '[]',
+        description TEXT NOT NULL DEFAULT '',
+        effect TEXT NOT NULL DEFAULT '',
+        sheen INTEGER NOT NULL DEFAULT 0,
+        difficulty INTEGER NOT NULL DEFAULT 1,
+        price_range TEXT NOT NULL DEFAULT '',
+        products TEXT NOT NULL DEFAULT '[]',
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        image_path TEXT NOT NULL DEFAULT ''
+      )
+    ''');
+  }
+
   Future<void> _createTables(Database db) async {
+    await _createTextureSamplesTable(db);
     await db.execute('''
       CREATE TABLE IF NOT EXISTS products (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -143,22 +192,24 @@ class AppDatabase {
     ''');
   }
 
+  // Стандартные ставки. price_per_sqm = верхняя граница рынка (для выставления клиенту).
+  // Используется и при первом seed, и при миграции (upsert по имени).
+  List<Map<String, Object>> _standardLaborRates() => [
+    {'name': '1-й слой декоративной штукатурки (база)', 'price_per_sqm': 450.0,   'unit': 'м²', 'market_min': 150.0,  'market_median': 280.0,  'market_max': 450.0},
+    {'name': '2-й слой декоративной штукатурки (слой)', 'price_per_sqm': 650.0,   'unit': 'м²', 'market_min': 300.0,  'market_median': 450.0,  'market_max': 650.0},
+    {'name': '3-й слой декоративной штукатурки (слой)', 'price_per_sqm': 600.0,   'unit': 'м²', 'market_min': 250.0,  'market_median': 400.0,  'market_max': 600.0},
+    {'name': 'Шёлк',                   'price_per_sqm': 1600.0,  'unit': 'м²', 'market_min': 700.0,  'market_median': 1100.0, 'market_max': 1600.0},
+    {'name': 'Велюр',                  'price_per_sqm': 1600.0,  'unit': 'м²', 'market_min': 700.0,  'market_median': 1100.0, 'market_max': 1600.0},
+    {'name': 'Замша',                  'price_per_sqm': 1800.0,  'unit': 'м²', 'market_min': 900.0,  'market_median': 1350.0, 'market_max': 1800.0},
+    {'name': 'Песок',                  'price_per_sqm': 900.0,   'unit': 'м²', 'market_min': 400.0,  'market_median': 650.0,  'market_max': 900.0},
+    {'name': 'Травертин',              'price_per_sqm': 1800.0,  'unit': 'м²', 'market_min': 1000.0, 'market_median': 1400.0, 'market_max': 1800.0},
+    {'name': 'Мармарин',               'price_per_sqm': 3000.0,  'unit': 'м²', 'market_min': 1500.0, 'market_median': 2200.0, 'market_max': 3000.0},
+    {'name': 'Барельеф',               'price_per_sqm': 15000.0, 'unit': 'м²', 'market_min': 5000.0, 'market_median': 8500.0, 'market_max': 15000.0},
+    {'name': 'Мрамор (венецианская)',  'price_per_sqm': 5000.0,  'unit': 'м²', 'market_min': 2500.0, 'market_median': 3800.0, 'market_max': 5000.0},
+  ];
+
   Future<void> _seedLaborRates(Database db) async {
-    // price_per_sqm = верхняя граница рынка (для выставления клиенту)
-    final rates = [
-      {'name': '1-й слой декоративной штукатурки (база)', 'price_per_sqm': 450.0,   'unit': 'м²', 'market_min': 150.0,  'market_median': 280.0,  'market_max': 450.0},
-      {'name': '2-й слой декоративной штукатурки (слой)', 'price_per_sqm': 650.0,   'unit': 'м²', 'market_min': 300.0,  'market_median': 450.0,  'market_max': 650.0},
-      {'name': '3-й слой декоративной штукатурки (слой)', 'price_per_sqm': 600.0,   'unit': 'м²', 'market_min': 250.0,  'market_median': 400.0,  'market_max': 600.0},
-      {'name': 'Шёлк',                   'price_per_sqm': 1600.0,  'unit': 'м²', 'market_min': 700.0,  'market_median': 1100.0, 'market_max': 1600.0},
-      {'name': 'Велюр',                  'price_per_sqm': 1600.0,  'unit': 'м²', 'market_min': 700.0,  'market_median': 1100.0, 'market_max': 1600.0},
-      {'name': 'Замша',                  'price_per_sqm': 1800.0,  'unit': 'м²', 'market_min': 900.0,  'market_median': 1350.0, 'market_max': 1800.0},
-      {'name': 'Песок',                  'price_per_sqm': 900.0,   'unit': 'м²', 'market_min': 400.0,  'market_median': 650.0,  'market_max': 900.0},
-      {'name': 'Травертин',              'price_per_sqm': 1800.0,  'unit': 'м²', 'market_min': 1000.0, 'market_median': 1400.0, 'market_max': 1800.0},
-      {'name': 'Мармарин',               'price_per_sqm': 3000.0,  'unit': 'м²', 'market_min': 1500.0, 'market_median': 2200.0, 'market_max': 3000.0},
-      {'name': 'Барельеф',               'price_per_sqm': 15000.0, 'unit': 'м²', 'market_min': 5000.0, 'market_median': 8500.0, 'market_max': 15000.0},
-      {'name': 'Мрамор (венецианская)',  'price_per_sqm': 5000.0,  'unit': 'м²', 'market_min': 2500.0, 'market_median': 3800.0, 'market_max': 5000.0},
-    ];
-    for (final r in rates) {
+    for (final r in _standardLaborRates()) {
       await db.insert('labor_rates', r);
     }
   }
@@ -279,12 +330,15 @@ class AppDatabase {
 
   Future<int> insertProduct(Product p) async {
     final db = await database;
-    return db.insert('products', p.toMap()..remove('id'));
+    final id = await db.insert('products', p.toMap()..remove('id'));
+    _bumpRevision();
+    return id;
   }
 
   Future<void> deleteProduct(int id) async {
     final db = await database;
     await db.delete('products', where: 'id = ?', whereArgs: [id]);
+    _bumpRevision();
   }
 
   // ─── Labor rates ───────────────────────────────────────────────
@@ -297,12 +351,46 @@ class AppDatabase {
 
   Future<int> insertLaborRate(LaborRate r) async {
     final db = await database;
-    return db.insert('labor_rates', r.toMap()..remove('id'));
+    final id = await db.insert('labor_rates', r.toMap()..remove('id'));
+    _bumpRevision();
+    return id;
   }
 
   Future<void> deleteLaborRate(int id) async {
     final db = await database;
     await db.delete('labor_rates', where: 'id = ?', whereArgs: [id]);
+    _bumpRevision();
+  }
+
+  // ─── Texture samples (галерея примеров) ──────────────────────────────
+  // Работаем с «сырыми» map, чтобы БД не зависела от UI-типов (Color/enum) —
+  // (де)сериализация в модель TextureSample живёт в samples_screen.dart.
+
+  Future<List<Map<String, Object?>>> getTextureSamples() async {
+    final db = await database;
+    return db.query('texture_samples', orderBy: 'sort_order, id');
+  }
+
+  Future<int> textureSamplesCount() async {
+    final db = await database;
+    final rows = await db.rawQuery('SELECT COUNT(*) AS c FROM texture_samples');
+    return (rows.first['c'] as int?) ?? 0;
+  }
+
+  Future<int> insertTextureSample(Map<String, Object?> m) async {
+    final db = await database;
+    return db.insert('texture_samples', m..remove('id'));
+  }
+
+  Future<void> updateTextureSample(int id, Map<String, Object?> m) async {
+    final db = await database;
+    await db.update('texture_samples', m..remove('id'),
+        where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> deleteTextureSample(int id) async {
+    final db = await database;
+    await db.delete('texture_samples', where: 'id = ?', whereArgs: [id]);
   }
 
   // ─── Invoices ─────────────────────────────────────────────────────

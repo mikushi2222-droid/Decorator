@@ -69,6 +69,14 @@ jobs:
           [ ! -f mobile/assets/fonts/NotoSans-Bold.ttf ]    && wget -q "$BASE/NotoSans-Bold.ttf"    -O mobile/assets/fonts/NotoSans-Bold.ttf    || true
           [ ! -f mobile/assets/fonts/NotoSans-Italic.ttf ]  && wget -q "$BASE/NotoSans-Italic.ttf"  -O mobile/assets/fonts/NotoSans-Italic.ttf  || true
           ls -lh mobile/assets/fonts/
+          # Проверка: без шрифтов PDF выйдет «квадратиками», поэтому валим сборку явно.
+          for f in NotoSans-Regular.ttf NotoSans-Bold.ttf NotoSans-Italic.ttf; do
+            p="mobile/assets/fonts/$f"
+            if [ ! -s "$p" ] || [ "$(stat -c%s "$p")" -lt 50000 ]; then
+              echo "::error::Шрифт $f отсутствует или слишком мал — PDF будет сломан."
+              exit 1
+            fi
+          done
 
       - name: Scaffold Flutter-проекта
         run: |
@@ -94,6 +102,10 @@ jobs:
 
       - name: flutter pub get
         run: flutter pub get
+        working-directory: /tmp/app
+
+      - name: Генерировать иконки
+        run: dart run flutter_launcher_icons
         working-directory: /tmp/app
 
       - name: flutter build apk
