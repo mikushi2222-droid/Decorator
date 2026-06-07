@@ -27,7 +27,7 @@ class AppDatabase {
     final path = join(await getDatabasesPath(), 'decorator.db');
     return openDatabase(
       path,
-      version: 5,
+      version: 6,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -89,9 +89,32 @@ class AppDatabase {
         }
       }
     }
+    if (oldVersion < 6) {
+      await _createTextureSamplesTable(db);
+    }
+  }
+
+  Future<void> _createTextureSamplesTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS texture_samples (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        grp TEXT NOT NULL,
+        pattern TEXT NOT NULL,
+        gradient TEXT NOT NULL DEFAULT '[]',
+        description TEXT NOT NULL DEFAULT '',
+        effect TEXT NOT NULL DEFAULT '',
+        sheen INTEGER NOT NULL DEFAULT 0,
+        difficulty INTEGER NOT NULL DEFAULT 1,
+        price_range TEXT NOT NULL DEFAULT '',
+        products TEXT NOT NULL DEFAULT '[]',
+        sort_order INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
   }
 
   Future<void> _createTables(Database db) async {
+    await _createTextureSamplesTable(db);
     await db.execute('''
       CREATE TABLE IF NOT EXISTS products (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -320,6 +343,37 @@ class AppDatabase {
     final db = await database;
     await db.delete('labor_rates', where: 'id = ?', whereArgs: [id]);
     _bumpRevision();
+  }
+
+  // ─── Texture samples (галерея примеров) ──────────────────────────────
+  // Работаем с «сырыми» map, чтобы БД не зависела от UI-типов (Color/enum) —
+  // (де)сериализация в модель TextureSample живёт в samples_screen.dart.
+
+  Future<List<Map<String, Object?>>> getTextureSamples() async {
+    final db = await database;
+    return db.query('texture_samples', orderBy: 'sort_order, id');
+  }
+
+  Future<int> textureSamplesCount() async {
+    final db = await database;
+    final rows = await db.rawQuery('SELECT COUNT(*) AS c FROM texture_samples');
+    return (rows.first['c'] as int?) ?? 0;
+  }
+
+  Future<int> insertTextureSample(Map<String, Object?> m) async {
+    final db = await database;
+    return db.insert('texture_samples', m..remove('id'));
+  }
+
+  Future<void> updateTextureSample(int id, Map<String, Object?> m) async {
+    final db = await database;
+    await db.update('texture_samples', m..remove('id'),
+        where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> deleteTextureSample(int id) async {
+    final db = await database;
+    await db.delete('texture_samples', where: 'id = ?', whereArgs: [id]);
   }
 
   // ─── Invoices ─────────────────────────────────────────────────────
