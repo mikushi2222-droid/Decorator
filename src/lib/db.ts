@@ -17,14 +17,15 @@ class DecoratorDB extends Dexie {
       laborRates: '++id, name',
       settings: '++id',
     })
+    // v2 — пустая миграция (схема не менялась). Раньше здесь был
+    // tx.table('products').clear(), который при апгрейде стирал каталог,
+    // включая товары, добавленные пользователем. Убрано во избежание потери данных.
     this.version(2).stores({
       clients: '++id, name, phone, createdAt',
       invoices: '++id, number, date, clientName, status, createdAt',
       products: '++id, name, category',
       laborRates: '++id, name',
       settings: '++id',
-    }).upgrade(async tx => {
-      await tx.table('products').clear()
     })
   }
 }

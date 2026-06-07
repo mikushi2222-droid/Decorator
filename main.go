@@ -32,11 +32,11 @@ func openBrowser(url string) {
 	time.Sleep(400 * time.Millisecond)
 	switch runtime.GOOS {
 	case "windows":
-		exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
+		_ = exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
 	case "darwin":
-		exec.Command("open", url).Start()
+		_ = exec.Command("open", url).Start()
 	default:
-		exec.Command("xdg-open", url).Start()
+		_ = exec.Command("xdg-open", url).Start()
 	}
 }
 
@@ -52,7 +52,7 @@ func serveFile(w http.ResponseWriter, path string) {
 	}
 	w.Header().Set("Cache-Control", "public, max-age=31536000")
 	w.WriteHeader(200)
-	w.Write(data)
+	_, _ = w.Write(data)
 }
 
 func serveIndex(w http.ResponseWriter) {
@@ -65,7 +65,7 @@ func serveIndex(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.WriteHeader(200)
-	io.Copy(w, f)
+	_, _ = io.Copy(w, f)
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
@@ -99,7 +99,15 @@ func main() {
 	go openBrowser(url)
 
 	fmt.Printf("Декоратор запущен: %s\n", url)
-	if err := http.ListenAndServe(addr, mux); err != nil {
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+	if err := srv.ListenAndServe(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}

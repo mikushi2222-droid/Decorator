@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
@@ -7,6 +8,13 @@ import 'models.dart';
 class AppDatabase {
   static final AppDatabase instance = AppDatabase._();
   static Database? _db;
+
+  /// Версия справочников (товары + ставки работ). Увеличивается при любом
+  /// изменении каталога или работ. Экраны Калькулятора и Каталога слушают её,
+  /// чтобы перезагрузить данные — иначе из-за IndexedStack они показывали бы
+  /// устаревший список до перезапуска приложения.
+  final ValueNotifier<int> dataRevision = ValueNotifier<int>(0);
+  void _bumpRevision() => dataRevision.value++;
 
   AppDatabase._();
 
@@ -282,12 +290,15 @@ class AppDatabase {
 
   Future<int> insertProduct(Product p) async {
     final db = await database;
-    return db.insert('products', p.toMap()..remove('id'));
+    final id = await db.insert('products', p.toMap()..remove('id'));
+    _bumpRevision();
+    return id;
   }
 
   Future<void> deleteProduct(int id) async {
     final db = await database;
     await db.delete('products', where: 'id = ?', whereArgs: [id]);
+    _bumpRevision();
   }
 
   // ─── Labor rates ───────────────────────────────────────────────
@@ -300,12 +311,15 @@ class AppDatabase {
 
   Future<int> insertLaborRate(LaborRate r) async {
     final db = await database;
-    return db.insert('labor_rates', r.toMap()..remove('id'));
+    final id = await db.insert('labor_rates', r.toMap()..remove('id'));
+    _bumpRevision();
+    return id;
   }
 
   Future<void> deleteLaborRate(int id) async {
     final db = await database;
     await db.delete('labor_rates', where: 'id = ?', whereArgs: [id]);
+    _bumpRevision();
   }
 
   // ─── Invoices ─────────────────────────────────────────────────────

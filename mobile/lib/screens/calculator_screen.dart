@@ -31,12 +31,15 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   void initState() {
     super.initState();
     _load();
+    // Перезагружаем справочники, когда товары/ставки меняются в Настройках.
+    AppDatabase.instance.dataRevision.addListener(_load);
   }
 
   Future<void> _load() async {
     final db = AppDatabase.instance;
     final products = await db.getProducts();
     final rates = await db.getLaborRates();
+    if (!mounted) return;
     setState(() {
       _plasters = products.where((p) => p.coverage > 0).toList();
       _laborRates = rates;
@@ -332,6 +335,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
 
   @override
   void dispose() {
+    AppDatabase.instance.dataRevision.removeListener(_load);
     _lengthC.dispose(); _widthC.dispose(); _heightC.dispose(); _areaC.dispose();
     super.dispose();
   }

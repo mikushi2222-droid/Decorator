@@ -85,12 +85,16 @@ export function CalculatorPage() {
       materialCost = materialPacks * pack * product.price
     }
 
-    const activeRates = (laborRates || []).filter((r) => selectedRates.includes(r.id!))
+    // В режиме «только материал» работы не учитываем — иначе в результате
+    // показывались бы строки работ, не входящие в «Итого».
+    const activeRates = mode !== 'material'
+      ? (laborRates || []).filter((r) => selectedRates.includes(r.id!))
+      : []
     const selectedLaborRates = activeRates.map((r) => ({
       rate: r,
       sqmCost: r.pricePerSqm * totalArea,
     }))
-    const laborCost = mode !== 'material' ? selectedLaborRates.reduce((s, r) => s + r.sqmCost, 0) : 0
+    const laborCost = selectedLaborRates.reduce((s, r) => s + r.sqmCost, 0)
 
     setResult({
       area: totalArea,

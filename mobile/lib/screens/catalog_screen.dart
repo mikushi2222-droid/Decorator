@@ -23,6 +23,14 @@ class _CatalogScreenState extends State<CatalogScreen> {
     super.initState();
     _loadCategories();
     _search();
+    // Обновляем каталог при изменении товаров в Настройках (IndexedStack
+    // держит экран живым, иначе список был бы устаревшим до перезапуска).
+    AppDatabase.instance.dataRevision.addListener(_onDataChanged);
+  }
+
+  void _onDataChanged() {
+    _loadCategories();
+    _search();
   }
 
   Future<void> _loadCategories() async {
@@ -138,6 +146,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
 
   @override
   void dispose() {
+    AppDatabase.instance.dataRevision.removeListener(_onDataChanged);
     _searchC.dispose();
     super.dispose();
   }

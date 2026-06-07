@@ -8,7 +8,8 @@ export interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextArea
 
 export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
   ({ className, label, error, id, ...props }, ref) => {
-    const textareaId = id || label?.toLowerCase().replace(/\s+/g, '-')
+    const reactId = React.useId()
+    const textareaId = id || reactId
     return (
       <div className="flex flex-col gap-1">
         {label && (

@@ -50,15 +50,24 @@ export function InvoicesPage() {
   )
 
   const handleCreate = async (data: Omit<Invoice, 'id' | 'number' | 'createdAt'>) => {
-    // Берём максимальный существующий порядковый номер (не count),
-    // чтобы удалённые накладные не вызывали дублирование номеров.
-    const last = await db.invoices.orderBy('number').last()
-    const lastNum = last ? parseInt(last.number.split('-')[2] ?? '0', 10) : 0
-    const number = generateInvoiceNumber(isNaN(lastNum) ? 0 : lastNum)
-    await db.invoices.add({
-      ...data,
-      number,
-      createdAt: new Date(),
+    // Нумерация сбрасывается по годам (префикс ДК-ГОД-). Считаем max порядкового
+    // номера только среди накладных текущего года, а чтение+запись делаем в одной
+    // транзакции, чтобы два быстрых создания не получили одинаковый номер.
+    const year = new Date().getFullYear()
+    await db.transaction('rw', db.invoices, async () => {
+      const yearInvoices = await db.invoices
+        .where('number')
+        .startsWith(`ДК-${year}-`)
+        .toArray()
+      const lastNum = yearInvoices.reduce((max, inv) => {
+        const n = parseInt(inv.number.split('-')[2] ?? '0', 10)
+        return isNaN(n) ? max : Math.max(max, n)
+      }, 0)
+      await db.invoices.add({
+        ...data,
+        number: generateInvoiceNumber(lastNum),
+        createdAt: new Date(),
+      })
     })
     setView('list')
   }
