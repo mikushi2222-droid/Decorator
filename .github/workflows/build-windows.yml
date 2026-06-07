@@ -103,7 +103,8 @@ jobs:
 
       - name: Отключить Android-иконки (нет android/ на Windows-раннере)
         shell: bash
-        run: sed -i 's/android: true/android: false/' C:/tmp/winapp/pubspec.yaml
+        run: |
+          sed -i "s/android: true/android: false/" C:/tmp/winapp/pubspec.yaml
 
       - name: Генерировать иконки
         run: dart run flutter_launcher_icons
