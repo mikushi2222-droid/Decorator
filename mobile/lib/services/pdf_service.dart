@@ -10,9 +10,11 @@ class PdfService {
   static Future<Uint8List> buildInvoicePdf(Invoice invoice, StoreSettings settings) async {
     final pdf = pw.Document();
 
-    final regularFont = pw.Font.ttf(await rootBundle.load('assets/fonts/NotoSans-Regular.ttf'));
-    final boldFont    = pw.Font.ttf(await rootBundle.load('assets/fonts/NotoSans-Bold.ttf'));
-    final italicFont  = pw.Font.ttf(await rootBundle.load('assets/fonts/NotoSans-Italic.ttf'));
+    // Шрифты грузим из bundled-ассетов (работает офлайн). Если ассет почему-то
+    // отсутствует — подстраховываемся загрузкой из сети, чтобы PDF не падал.
+    final regularFont = await _loadFont('assets/fonts/NotoSans-Regular.ttf', PdfGoogleFonts.notoSansRegular);
+    final boldFont    = await _loadFont('assets/fonts/NotoSans-Bold.ttf',    PdfGoogleFonts.notoSansBold);
+    final italicFont  = await _loadFont('assets/fonts/NotoSans-Italic.ttf',  PdfGoogleFonts.notoSansItalic);
 
     final brand = PdfColor.fromHex('#1E3A4A');
 
@@ -187,6 +189,14 @@ class PdfService {
     ));
 
     return pdf.save();
+  }
+
+  static Future<pw.Font> _loadFont(String asset, Future<pw.Font> Function() fallback) async {
+    try {
+      return pw.Font.ttf(await rootBundle.load(asset));
+    } catch (_) {
+      return fallback();
+    }
   }
 
   static pw.Widget _th(String text, pw.Font font, {pw.TextAlign align = pw.TextAlign.left}) =>
