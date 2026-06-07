@@ -281,11 +281,20 @@ class _SamplesScreenState extends State<SamplesScreen> {
   TextureGroup? _filter;
   List<TextureSample> _samples = [];
   bool _loading = true;
+  bool _sortMode = false;
+  final _searchC = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _load();
+    _searchC.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _searchC.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -304,8 +313,37 @@ class _SamplesScreenState extends State<SamplesScreen> {
     });
   }
 
-  List<TextureSample> get _visible =>
-      _filter == null ? _samples : _samples.where((s) => s.group == _filter).toList();
+  List<TextureSample> get _visible {
+    final q = _searchC.text.trim().toLowerCase();
+    return _samples.where((s) {
+      final matchGroup = _filter == null || s.group == _filter;
+      final matchSearch = q.isEmpty ||
+          s.name.toLowerCase().contains(q) ||
+          s.effect.toLowerCase().contains(q) ||
+          s.description.toLowerCase().contains(q);
+      return matchGroup && matchSearch;
+    }).toList();
+  }
+
+  Future<void> _reorder(int oldIndex, int newIndex) async {
+    if (newIndex > oldIndex) newIndex--;
+    final list = _visible.toList();
+    final moved = list.removeAt(oldIndex);
+    list.insert(newIndex, moved);
+    // Rebuild full _samples with updated order
+    final visible = list.map((s) => s.id).toSet();
+    final others = _samples.where((s) => !visible.contains(s.id)).toList();
+    final reordered = [...list, ...others];
+    setState(() => _samples = reordered);
+    // Persist sort_order
+    for (var i = 0; i < reordered.length; i++) {
+      final s = reordered[i];
+      if (s.id != null) {
+        await AppDatabase.instance.updateTextureSample(
+            s.id!, s.copyWith(sortOrder: i).toMap());
+      }
+    }
+  }
 
   Future<void> _addNew() async {
     final saved = await Navigator.push<bool>(
@@ -360,15 +398,22 @@ class _SamplesScreenState extends State<SamplesScreen> {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
+    final visible = _visible;
     return Column(
       children: [
-        // Header + add
+        // Header row
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
           child: Row(children: [
             const Expanded(
               child: Text('Примеры покрытий',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            ),
+            IconButton(
+              tooltip: _sortMode ? 'Готово' : 'Сортировать',
+              icon: Icon(_sortMode ? Icons.check_circle_outline : Icons.swap_vert,
+                  color: _sortMode ? Colors.green : null),
+              onPressed: () => setState(() => _sortMode = !_sortMode),
             ),
             FilledButton.icon(
               onPressed: _addNew,
@@ -383,48 +428,115 @@ class _SamplesScreenState extends State<SamplesScreen> {
           ]),
         ),
 
+        // Search bar
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+          child: TextField(
+            controller: _searchC,
+            decoration: InputDecoration(
+              hintText: 'Поиск по фактурам…',
+              prefixIcon: const Icon(Icons.search, size: 18),
+              suffixIcon: _searchC.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, size: 16),
+                      onPressed: _searchC.clear,
+                    )
+                  : null,
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+            ),
+          ),
+        ),
+
         // Group filter chips
         SizedBox(
-          height: 44,
+          height: 40,
           child: ListView(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             children: [
               _chip('Все', _filter == null, () => setState(() => _filter = null)),
               const SizedBox(width: 6),
               ...TextureGroup.values.map((g) => Padding(
                     padding: const EdgeInsets.only(right: 6),
-                    child: _chip(g.label, _filter == g, () => setState(() => _filter = g), color: g.color),
+                    child: _chip(g.label, _filter == g,
+                        () => setState(() => _filter = g), color: g.color),
                   )),
             ],
           ),
         ),
 
-        // Grid
+        if (_sortMode)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+            child: Text('Удерживайте и перетащите для изменения порядка',
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+          ),
+
+        // Content
         Expanded(
-          child: _visible.isEmpty
-              ? const Center(
-                  child: Text('Примеров пока нет. Нажмите «Добавить».',
-                      style: TextStyle(color: Colors.grey)),
+          child: visible.isEmpty
+              ? Center(
+                  child: Text(
+                    _searchC.text.isNotEmpty
+                        ? 'Ничего не найдено'
+                        : 'Примеров пока нет. Нажмите «Добавить».',
+                    style: const TextStyle(color: Colors.grey),
+                  ),
                 )
-              : GridView.builder(
-                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    mainAxisSpacing: 10,
-                    crossAxisSpacing: 10,
-                    childAspectRatio: 0.75,
-                  ),
-                  itemCount: _visible.length,
-                  itemBuilder: (_, i) => _SampleCard(
-                    sample: _visible[i],
-                    onTap: () => _openDetail(_visible[i]),
-                  ),
-                ),
+              : _sortMode
+                  ? _buildSortList(visible)
+                  : _buildGrid(visible),
         ),
       ],
     );
   }
+
+  Widget _buildGrid(List<TextureSample> items) => GridView.builder(
+        padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          mainAxisSpacing: 10,
+          crossAxisSpacing: 10,
+          childAspectRatio: 0.75,
+        ),
+        itemCount: items.length,
+        itemBuilder: (_, i) => _SampleCard(
+          sample: items[i],
+          onTap: () => _openDetail(items[i]),
+        ),
+      );
+
+  Widget _buildSortList(List<TextureSample> items) => ReorderableListView.builder(
+        padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
+        onReorder: _reorder,
+        itemCount: items.length,
+        itemBuilder: (_, i) {
+          final s = items[i];
+          final hasImg = s.imagePath.isNotEmpty && File(s.imagePath).existsSync();
+          return Card(
+            key: ValueKey(s.id ?? i),
+            margin: const EdgeInsets.only(bottom: 6),
+            child: ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              leading: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: SizedBox(
+                  width: 52, height: 52,
+                  child: hasImg
+                      ? Image.file(File(s.imagePath), fit: BoxFit.cover)
+                      : CustomPaint(painter: _TexturePainter(s.pattern, s.gradient)),
+                ),
+              ),
+              title: Text(s.name,
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+              subtitle: Text(s.effect,
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+              trailing: const Icon(Icons.drag_handle, color: Colors.grey),
+            ),
+          );
+        },
+      );
 
   Widget _chip(String label, bool active, VoidCallback onTap, {Color? color}) {
     final c = color ?? const Color(0xFF1E3A4A);

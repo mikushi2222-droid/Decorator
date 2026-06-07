@@ -104,6 +104,10 @@ jobs:
         run: flutter pub get
         working-directory: /tmp/app
 
+      - name: Генерировать иконки
+        run: dart run flutter_launcher_icons
+        working-directory: /tmp/app
+
       - name: flutter build apk
         run: flutter build apk --release --split-per-abi
         working-directory: /tmp/app

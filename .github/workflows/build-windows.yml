@@ -101,9 +101,18 @@ jobs:
         run: flutter pub get
         working-directory: C:/tmp/winapp
 
+      - name: Генерировать иконки
+        run: dart run flutter_launcher_icons
+        working-directory: C:/tmp/winapp
+
       - name: flutter build windows
         run: flutter build windows --release
         working-directory: C:/tmp/winapp
+
+      - name: Создать MSIX
+        run: dart run msix:create
+        working-directory: C:/tmp/winapp
+        continue-on-error: true
 
       - name: Упаковать в ZIP
         shell: pwsh
@@ -112,6 +121,9 @@ jobs:
           $src   = "C:/tmp/winapp/build/windows/x64/runner/Release"
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           Compress-Archive -Path "$src/*" -DestinationPath "dist/Decorator-${label}-windows.zip"
+          # MSIX если создался
+          $msix = Get-ChildItem "C:/tmp/winapp/build/windows/x64" -Filter "*.msix" -Recurse | Select-Object -First 1
+          if ($msix) { Copy-Item $msix.FullName "dist/Decorator-${label}.msix" }
 
       - name: Загрузить артефакт (все запуски)
         uses: actions/upload-artifact@v4
@@ -129,8 +141,11 @@ jobs:
           body: |
             ## Windows
 
-            Распакуйте `Decorator-*-windows.zip` и запустите `decorator.exe`.
-          files: dist/Decorator-${{ steps.ver.outputs.label }}-windows.zip
+            **Рекомендуется:** установщик `Decorator-*.msix` (если есть в вложениях).
+            **Альтернатива:** распакуйте `Decorator-*-windows.zip` и запустите `decorator.exe`.
+          files: |
+            dist/Decorator-${{ steps.ver.outputs.label }}-windows.zip
+            dist/Decorator-${{ steps.ver.outputs.label }}.msix
           draft: false
           prerelease: false
         env:

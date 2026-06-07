@@ -1,7 +1,7 @@
 name: decorator
 description: Декоратор — накладные и калькулятор для ООО АКЦЕНТ
 publish_to: 'none'
-version: 0.1.0+1
+version: 0.2.0+2
 
 environment:
   sdk: '>=3.3.0 <4.0.0'
@@ -25,9 +25,34 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.3
+  msix: ^3.16.7
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  windows:
+    generate: true
+    image_path: assets/icon/app_icon.png
+    icon_size: 48
+  image_path: assets/icon/app_icon.png
+  min_sdk_android: 21
+  adaptive_icon_background: '#1E3A4A'
+  adaptive_icon_foreground: assets/icon/app_icon.png
+
+msix_config:
+  display_name: Декоратор
+  publisher_display_name: ООО АКЦЕНТ
+  identity_name: com.ooo-akcent.decorator
+  msix_version: 0.2.0.0
+  logo_path: assets/icon/app_icon.png
+  capabilities: 'fileOpenPicker, picturesLibrary'
+  languages: 'ru-ru'
+  output_name: Decorator
 
 flutter:
   uses-material-design: true
   assets:
     - assets/products.json
     - assets/fonts/
+    - assets/icon/
