@@ -37,7 +37,7 @@ class AppDatabase {
     }
     return openDatabase(
       path,
-      version: 9,
+      version: 10,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -124,6 +124,15 @@ class AppDatabase {
           updated_at TEXT NOT NULL DEFAULT ''
         )
       ''');
+    }
+    if (oldVersion < 10) {
+      for (final col in const ['decorator_name', 'business_type']) {
+        try {
+          final def = col == 'business_type' ? "'ooo'" : "''";
+          await db.execute(
+              'ALTER TABLE settings ADD COLUMN $col TEXT NOT NULL DEFAULT $def');
+        } catch (_) {}
+      }
     }
   }
 
@@ -536,6 +545,16 @@ class AppDatabase {
     final rows = await db.query('settings', limit: 1);
     if (rows.isEmpty) return StoreSettings.defaults();
     return StoreSettings.fromMap(rows.first);
+  }
+
+  Future<String> getDecoratorName() async {
+    final s = await getSettings();
+    return s.decoratorName;
+  }
+
+  Future<void> saveDecoratorName(String name) async {
+    final s = await getSettings();
+    await saveSettings(s.copyWith(decoratorName: name));
   }
 
   Future<void> saveSettings(StoreSettings s) async {

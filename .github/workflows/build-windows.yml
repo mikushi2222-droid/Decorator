@@ -101,6 +101,12 @@ jobs:
         run: flutter pub get
         working-directory: C:/tmp/winapp
 
+      - name: Отключить Android иконки для Windows
+        shell: pwsh
+        run: |
+          $f = "C:/tmp/winapp/pubspec.yaml"
+          (Get-Content $f) -replace 'android: true', 'android: false' | Set-Content $f
+
       - name: Генерировать иконки
         run: dart run flutter_launcher_icons
         working-directory: C:/tmp/winapp

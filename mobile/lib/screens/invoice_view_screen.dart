@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../database.dart';
+import '../main.dart';
 import '../models.dart';
 import '../utils.dart';
 import '../services/pdf_service.dart';
@@ -83,8 +84,8 @@ class _InvoiceViewScreenState extends State<InvoiceViewScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const brand = Color(0xFF1E3A4A);
     return Scaffold(
+      backgroundColor: kBackground,
       appBar: AppBar(
         title: Text(_invoice.number),
         actions: [
@@ -120,31 +121,42 @@ class _InvoiceViewScreenState extends State<InvoiceViewScreen> {
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(children: [
+                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  // Logo top-left
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.asset(
+                      'assets/logo_akcent.jpg',
+                      width: 64,
+                      height: 64,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Text(_invoice.number,
                           style: const TextStyle(
-                              fontSize: 20, fontWeight: FontWeight.bold, color: brand)),
+                              fontSize: 20, fontWeight: FontWeight.bold, color: kBronze)),
                       const SizedBox(height: 2),
                       Text(formatDate(_invoice.date),
-                          style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+                          style: const TextStyle(color: Color(0xFFB0A090), fontSize: 13)),
                     ]),
                   ),
                   _StatusChip(status: _invoice.status),
                 ]),
                 const Divider(height: 20),
-                Text('ПОКУПАТЕЛЬ', style: TextStyle(fontSize: 11, color: Colors.grey.shade500, letterSpacing: 1)),
+                const Text('ПОКУПАТЕЛЬ', style: TextStyle(fontSize: 11, color: Color(0xFFB0A090), letterSpacing: 1)),
                 const SizedBox(height: 4),
                 Text(_invoice.clientName,
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: kGraphite)),
                 if (_invoice.clientPhone.isNotEmpty) ...[
                   const SizedBox(height: 2),
-                  Text(_invoice.clientPhone, style: TextStyle(color: Colors.grey.shade600)),
+                  Text(_invoice.clientPhone, style: const TextStyle(color: Color(0xFF9E9585))),
                 ],
                 if (_invoice.clientAddress.isNotEmpty) ...[
                   const SizedBox(height: 2),
-                  Text(_invoice.clientAddress, style: TextStyle(color: Colors.grey.shade600)),
+                  Text(_invoice.clientAddress, style: const TextStyle(color: Color(0xFF9E9585))),
                 ],
               ]),
             ),
@@ -156,7 +168,7 @@ class _InvoiceViewScreenState extends State<InvoiceViewScreen> {
             child: Column(children: [
               Container(
                 decoration: const BoxDecoration(
-                  color: brand,
+                  color: kBronze,
                   borderRadius: BorderRadius.only(
                     topLeft: Radius.circular(12),
                     topRight: Radius.circular(12),
@@ -176,7 +188,7 @@ class _InvoiceViewScreenState extends State<InvoiceViewScreen> {
               ),
               ..._invoice.items.asMap().entries.map((e) => Container(
                     decoration: BoxDecoration(
-                      color: e.key.isOdd ? Colors.grey.shade50 : null,
+                      color: e.key.isOdd ? kGoldLight : null,
                     ),
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     child: Row(children: [
@@ -207,10 +219,10 @@ class _InvoiceViewScreenState extends State<InvoiceViewScreen> {
                       valueColor: Colors.red.shade700),
                 const Divider(height: 16),
                 Row(children: [
-                  const Expanded(child: Text('ИТОГО', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
+                  const Expanded(child: Text('ИТОГО', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: kGraphite))),
                   Text(formatCurrency(_invoice.total),
                       style: const TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 22, color: brand)),
+                          fontWeight: FontWeight.bold, fontSize: 22, color: kBronze)),
                 ]),
               ]),
             ),
@@ -235,8 +247,8 @@ class _InvoiceViewScreenState extends State<InvoiceViewScreen> {
             child: Padding(
               padding: const EdgeInsets.all(14),
               child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                Text('Статус накладной',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.grey.shade700)),
+                const Text('Статус накладной',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: kGraphite)),
                 const SizedBox(height: 10),
                 Row(children: [
                   Expanded(child: _statusBtn('Черновик', InvoiceStatus.draft, Colors.grey)),
@@ -268,9 +280,9 @@ class _InvoiceViewScreenState extends State<InvoiceViewScreen> {
   Widget _totRow(String label, String value, {Color? valueColor}) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 3),
         child: Row(children: [
-          Expanded(child: Text(label, style: TextStyle(color: Colors.grey.shade600))),
+          Expanded(child: Text(label, style: const TextStyle(color: Color(0xFF9E9585)))),
           Text(value,
-              style: TextStyle(fontWeight: FontWeight.w600, color: valueColor)),
+              style: TextStyle(fontWeight: FontWeight.w600, color: valueColor ?? kGraphite)),
         ]),
       );
 

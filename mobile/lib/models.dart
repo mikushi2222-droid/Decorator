@@ -280,6 +280,9 @@ class StoreSettings {
   final String bankInn;
   final String bankKpp;
   final String adText;
+  // Профиль декоратора
+  final String decoratorName;     // Имя для приветствия ("Анна")
+  final String businessType;      // 'ooo' | 'ip' | 'samozanyat' | 'fizlico'
 
   const StoreSettings({
     this.id,
@@ -296,6 +299,8 @@ class StoreSettings {
     this.bankInn = '',
     this.bankKpp = '',
     this.adText = '',
+    this.decoratorName = '',
+    this.businessType = 'ooo',
   });
 
   factory StoreSettings.defaults() => const StoreSettings(
@@ -310,6 +315,7 @@ class StoreSettings {
         bankInn: '7707083893',
         bankKpp: '784243001',
         adText: 'Барельефы · Скалы · Травертин · Шёлк · Обучение и мастер-классы',
+        businessType: 'ooo',
       );
 
   StoreSettings copyWith({
@@ -317,7 +323,7 @@ class StoreSettings {
     String? inn, String? kpp, String? ogrn,
     String? bankName, String? bankBik, String? bankAccount,
     String? bankCorrAccount, String? bankInn, String? bankKpp,
-    String? adText,
+    String? adText, String? decoratorName, String? businessType,
   }) => StoreSettings(
         id: id,
         name: name ?? this.name,
@@ -333,6 +339,8 @@ class StoreSettings {
         bankInn: bankInn ?? this.bankInn,
         bankKpp: bankKpp ?? this.bankKpp,
         adText: adText ?? this.adText,
+        decoratorName: decoratorName ?? this.decoratorName,
+        businessType: businessType ?? this.businessType,
       );
 
   Map<String, dynamic> toMap() => {
@@ -350,6 +358,8 @@ class StoreSettings {
         'bank_inn': bankInn,
         'bank_kpp': bankKpp,
         'ad_text': adText,
+        'decorator_name': decoratorName,
+        'business_type': businessType,
       };
 
   factory StoreSettings.fromMap(Map<String, dynamic> m) => StoreSettings(
@@ -367,5 +377,7 @@ class StoreSettings {
         bankInn: (m['bank_inn'] as String?) ?? '',
         bankKpp: (m['bank_kpp'] as String?) ?? '',
         adText: (m['ad_text'] as String?) ?? '',
+        decoratorName: (m['decorator_name'] as String?) ?? '',
+        businessType: (m['business_type'] as String?) ?? 'ooo',
       );
 }
