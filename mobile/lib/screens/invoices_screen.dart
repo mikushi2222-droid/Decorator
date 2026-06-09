@@ -17,6 +17,7 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
   final _searchC = TextEditingController();
   String _statusFilter = 'all';
   List<Invoice> _all = [];
+  Invoice? _pendingDelete;
   bool _loading = true;
 
   static const _filters = <(String, String)>[
@@ -38,9 +39,42 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
     final invoices = await AppDatabase.instance.getInvoices();
     if (!mounted) return;
     setState(() {
-      _all = invoices;
+      _all = _pendingDelete == null
+          ? invoices
+          : invoices.where((i) => i.id != _pendingDelete!.id).toList();
       _loading = false;
     });
+  }
+
+  void _swipeDelete(Invoice inv) {
+    setState(() {
+      _all.removeWhere((i) => i.id == inv.id);
+      _pendingDelete = inv;
+    });
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(SnackBar(
+        content: Text('Накладная ${inv.number} удалена'),
+        action: SnackBarAction(label: 'Отменить', onPressed: _undoDelete),
+        duration: const Duration(seconds: 4),
+      )).closed.then((reason) {
+        if (reason != SnackBarClosedReason.action) _commitDelete();
+      });
+  }
+
+  void _undoDelete() {
+    if (_pendingDelete == null) return;
+    setState(() {
+      _all.add(_pendingDelete!);
+      _all.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      _pendingDelete = null;
+    });
+  }
+
+  Future<void> _commitDelete() async {
+    final inv = _pendingDelete;
+    _pendingDelete = null;
+    if (inv?.id != null) await AppDatabase.instance.deleteInvoice(inv!.id!);
   }
 
   List<Invoice> get _filtered {
@@ -191,10 +225,37 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
                       padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
                       itemCount: filtered.length,
                       separatorBuilder: (_, __) => const SizedBox(height: 8),
-                      itemBuilder: (_, i) => _InvoiceTile(
-                        invoice: filtered[i],
-                        onTap: () => _open(filtered[i]),
-                      ),
+                      itemBuilder: (_, i) {
+                        final inv = filtered[i];
+                        return Dismissible(
+                          key: ValueKey(inv.id ?? inv.number),
+                          direction: DismissDirection.endToStart,
+                          background: Container(
+                            alignment: Alignment.centerRight,
+                            padding: const EdgeInsets.only(right: 24),
+                            decoration: BoxDecoration(
+                              color: Colors.red.shade600,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.delete_outline,
+                                    color: Colors.white, size: 22),
+                                SizedBox(height: 2),
+                                Text('Удалить',
+                                    style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w600)),
+                              ],
+                            ),
+                          ),
+                          onDismissed: (_) => _swipeDelete(inv),
+                          child: _InvoiceTile(
+                              invoice: inv, onTap: () => _open(inv)),
+                        );
+                      },
                     ),
         ),
       ],

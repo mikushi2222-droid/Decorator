@@ -16,7 +16,7 @@ class PdfService {
     final boldFont    = await _loadFont('assets/fonts/NotoSans-Bold.ttf',    PdfGoogleFonts.notoSansBold);
     final italicFont  = await _loadFont('assets/fonts/NotoSans-Italic.ttf',  PdfGoogleFonts.notoSansItalic);
 
-    final brand = PdfColor.fromHex('#1E3A4A');
+    final brand = PdfColor.fromHex('#9A7B5F'); // kBronze
     final logo = await _loadLogo('assets/logo_akcent.jpg');
 
     pdf.addPage(pw.MultiPage(
@@ -69,7 +69,7 @@ class PdfService {
         pw.Container(
           padding: const pw.EdgeInsets.all(10),
           decoration: pw.BoxDecoration(
-            color: PdfColor.fromHex('#F0F4F6'),
+            color: PdfColor.fromHex('#F5EDE0'),
             borderRadius: pw.BorderRadius.circular(6),
           ),
           child: pw.Row(
@@ -117,7 +117,7 @@ class PdfService {
             ...invoice.items.asMap().entries.map((e) {
               final idx = e.key;
               final item = e.value;
-              final bg = idx.isOdd ? PdfColor.fromHex('#F8FAFB') : PdfColors.white;
+              final bg = idx.isOdd ? PdfColor.fromHex('#F5EDE0') : PdfColors.white;
               return pw.TableRow(
                 decoration: pw.BoxDecoration(color: bg),
                 children: [

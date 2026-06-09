@@ -6,9 +6,11 @@ import '../utils.dart';
 
 class InvoiceFormScreen extends StatefulWidget {
   final Invoice? existingInvoice; // null = новая, non-null = редактирование
+  final Product? fromProduct;     // быстрое создание из каталога
   const InvoiceFormScreen({
     super.key,
     this.existingInvoice,
+    this.fromProduct,
   });
 
   @override
@@ -32,6 +34,7 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
   Object? _productSearchToken;
 
   // Автодополнение клиентов
+  final _clientNameFocus = FocusNode();
   List<Client> _clientSuggestions = [];
   Object? _clientSearchToken;
 
@@ -40,6 +43,7 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
   @override
   void initState() {
     super.initState();
+    _clientNameFocus.addListener(_onClientFocus);
     final inv = widget.existingInvoice;
     if (inv != null) {
       // Режим редактирования
@@ -57,6 +61,15 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
         priceC: TextEditingController(text: item.price.toStringAsFixed(2)),
       )).toList();
       if (_items.isEmpty) _items = [_ItemEntry()];
+    } else if (widget.fromProduct != null) {
+      final p = widget.fromProduct!;
+      _items = [_ItemEntry(
+        productId: p.id,
+        nameC:  TextEditingController(text: p.name),
+        unitC:  TextEditingController(text: p.unit),
+        qtyC:   TextEditingController(text: '1'),
+        priceC: TextEditingController(text: p.price.toStringAsFixed(2)),
+      )];
     } else {
       _items = [_ItemEntry()];
     }
@@ -92,8 +105,20 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
 
   // ── Автодополнение клиентов ────────────────────────────────────────────────
 
+  void _onClientFocus() {
+    if (_clientNameFocus.hasFocus && _clientNameC.text.isEmpty) {
+      _loadRecentClients();
+    }
+  }
+
+  void _loadRecentClients() async {
+    final res = await AppDatabase.instance.getAllClients();
+    if (!mounted) return;
+    setState(() => _clientSuggestions = res.take(5).toList());
+  }
+
   void _searchClients(String q) async {
-    if (q.isEmpty) { setState(() => _clientSuggestions = []); return; }
+    if (q.isEmpty) { _loadRecentClients(); return; }
     final token = Object();
     _clientSearchToken = token;
     final res = await AppDatabase.instance.searchClients(q);
@@ -229,6 +254,7 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
             // Поле с автодополнением
             TextFormField(
               controller: _clientNameC,
+              focusNode: _clientNameFocus,
               decoration: const InputDecoration(
                 labelText: 'Имя / Организация *',
                 hintText: 'Иванов Иван Иванович',
@@ -423,6 +449,8 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
 
   @override
   void dispose() {
+    _clientNameFocus.removeListener(_onClientFocus);
+    _clientNameFocus.dispose();
     _clientNameC.dispose(); _clientPhoneC.dispose(); _clientAddressC.dispose();
     _notesC.dispose(); _discountC.dispose(); _productSearchC.dispose();
     for (final i in _items) i.dispose();

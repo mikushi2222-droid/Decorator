@@ -3,6 +3,7 @@ import '../main.dart';
 import '../database.dart';
 import '../models.dart';
 import '../utils.dart';
+import 'invoice_form_screen.dart';
 
 class CatalogScreen extends StatefulWidget {
   const CatalogScreen({super.key});
@@ -156,7 +157,16 @@ class _CatalogScreenState extends State<CatalogScreen> {
                       padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
                       itemCount: _products.length,
                       separatorBuilder: (_, __) => const SizedBox(height: 6),
-                      itemBuilder: (_, i) => _ProductTile(product: _products[i]),
+                      itemBuilder: (_, i) => _ProductTile(
+                        product: _products[i],
+                        onCreateInvoice: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => InvoiceFormScreen(
+                                fromProduct: _products[i]),
+                          ),
+                        ),
+                      ),
                     ),
         ),
       ],
@@ -173,13 +183,14 @@ class _CatalogScreenState extends State<CatalogScreen> {
 
 class _ProductTile extends StatelessWidget {
   final Product product;
-  const _ProductTile({required this.product});
+  final VoidCallback onCreateInvoice;
+  const _ProductTile({required this.product, required this.onCreateInvoice});
 
   @override
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        padding: const EdgeInsets.fromLTRB(14, 10, 4, 10),
         child: Row(children: [
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -213,6 +224,12 @@ class _ProductTile extends StatelessWidget {
                       overflow: TextOverflow.ellipsis),
                 ),
             ]),
+          ),
+          IconButton(
+            onPressed: onCreateInvoice,
+            icon: const Icon(Icons.receipt_long_outlined, size: 20, color: kBronze),
+            tooltip: 'Создать накладную',
+            visualDensity: VisualDensity.compact,
           ),
         ]),
       ),

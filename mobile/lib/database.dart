@@ -554,31 +554,6 @@ class AppDatabase {
     }
   }
 
-  // ─── Onboarding ───────────────────────────────────────────────────
-
-  Future<bool> isOnboardingShown() async {
-    final db = await database;
-    final rows = await db.query('settings',
-        columns: ['onboarding_shown'], limit: 1);
-    if (rows.isEmpty) return false;
-    return (rows.first['onboarding_shown'] as int? ?? 0) == 1;
-  }
-
-  Future<void> markOnboardingShown() async {
-    final db = await database;
-    final rows = await db.query('settings', columns: ['id'], limit: 1);
-    if (rows.isEmpty) {
-      await db.insert('settings', {'onboarding_shown': 1});
-    } else {
-      await db.update(
-        'settings',
-        {'onboarding_shown': 1},
-        where: 'id = ?',
-        whereArgs: [rows.first['id']],
-      );
-    }
-  }
-
   // ─── Settings ───────────────────────────────────────────────────────
 
   Future<StoreSettings> getSettings() async {
@@ -586,16 +561,6 @@ class AppDatabase {
     final rows = await db.query('settings', limit: 1);
     if (rows.isEmpty) return StoreSettings.defaults();
     return StoreSettings.fromMap(rows.first);
-  }
-
-  Future<String> getDecoratorName() async {
-    final s = await getSettings();
-    return s.decoratorName;
-  }
-
-  Future<void> saveDecoratorName(String name) async {
-    final s = await getSettings();
-    await saveSettings(s.copyWith(decoratorName: name));
   }
 
   Future<void> saveSettings(StoreSettings s) async {
