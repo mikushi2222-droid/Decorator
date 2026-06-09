@@ -6,8 +6,6 @@ import '../database.dart';
 import '../main.dart';
 import '../models.dart';
 import '../utils.dart';
-import 'onboarding_screen.dart';
-import 'samples_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -23,20 +21,27 @@ class _SettingsScreenState extends State<SettingsScreen>
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 4, vsync: this);
+    _tabs = TabController(length: 3, vsync: this);
   }
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
+        const Padding(
+          padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text('Настройки',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: kGraphite)),
+          ),
+        ),
         TabBar(
           controller: _tabs,
           tabs: const [
             Tab(icon: Icon(Icons.store, size: 18), text: 'Реквизиты'),
             Tab(icon: Icon(Icons.inventory_2_outlined, size: 18), text: 'Товары'),
             Tab(icon: Icon(Icons.construction_outlined, size: 18), text: 'Работы'),
-            Tab(icon: Icon(Icons.texture, size: 18), text: 'Примеры'),
           ],
           labelColor: kBronze,
           indicatorColor: kBronze,
@@ -48,7 +53,6 @@ class _SettingsScreenState extends State<SettingsScreen>
               _StoreSettingsTab(),
               _ProductsTab(),
               _LaborTab(),
-              SamplesScreen(),
             ],
           ),
         ),
@@ -207,26 +211,6 @@ class _StoreSettingsTabState extends State<_StoreSettingsTab> {
           onPressed: _save,
           icon: Icon(_saved ? Icons.check : Icons.save),
           label: Text(_saved ? 'Сохранено!' : 'Сохранить реквизиты'),
-        ),
-        const SizedBox(height: 12),
-        OutlinedButton.icon(
-          onPressed: () async {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const OnboardingScreen(),
-                fullscreenDialog: true,
-              ),
-            );
-            if (mounted) _load();
-          },
-          icon: const Icon(Icons.slideshow_outlined, size: 18),
-          label: const Text('Знакомство с приложением'),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: kBronze,
-            side: const BorderSide(color: kBronze),
-            padding: const EdgeInsets.symmetric(vertical: 14),
-          ),
         ),
         const SizedBox(height: 24),
       ]),

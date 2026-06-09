@@ -426,9 +426,7 @@ class AppDatabase {
     _bumpRevision();
   }
 
-  // ─── Texture samples (галерея примеров) ──────────────────────────────
-  // Работаем с «сырыми» map, чтобы БД не зависела от UI-типов (Color/enum) —
-  // (де)сериализация в модель TextureSample живёт в samples_screen.dart.
+  // ─── Texture samples (raw map access, schema retained for data compatibility) ───
 
   Future<List<Map<String, Object?>>> getTextureSamples() async {
     final db = await database;

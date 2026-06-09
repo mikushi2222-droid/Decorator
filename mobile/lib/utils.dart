@@ -1,8 +1,9 @@
 import 'package:intl/intl.dart';
 import 'models.dart';
 
-final _rub = NumberFormat('#,##0.00', 'ru_RU');
-final _num = NumberFormat('#,##0.##', 'ru_RU');
+final _rub     = NumberFormat('#,##0.00',  'ru_RU');
+final _num     = NumberFormat('#,##0.##',  'ru_RU');
+final _compact = NumberFormat('#,##0.#',   'ru_RU');
 final _dateFmt = DateFormat('d MMMM yyyy г.', 'ru_RU');
 final _dateShort = DateFormat('dd.MM.yyyy', 'ru_RU');
 
@@ -14,9 +15,16 @@ double _normCurrency(double v) {
 }
 
 String formatCurrency(double v) => '${_rub.format(_normCurrency(v))} ₽';
-String formatNumber(double v) => _num.format(v);
-String formatDate(DateTime d) => _dateFmt.format(d);
+String formatNumber(double v)   => _num.format(v);
+String formatDate(DateTime d)   => _dateFmt.format(d);
 String formatDateShort(DateTime d) => _dateShort.format(d);
+
+String formatCompact(double v) {
+  final abs = v.abs();
+  if (abs >= 1000000) return '${_compact.format(v / 1000000)} млн ₽';
+  if (abs >= 1000)    return '${_compact.format(v / 1000)} тыс ₽';
+  return '${v.round()} ₽';
+}
 
 /// Разбор числа из пользовательского ввода: принимает и точку, и русскую
 /// запятую как десятичный разделитель, игнорирует пробелы-разделители разрядов.

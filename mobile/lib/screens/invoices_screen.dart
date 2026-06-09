@@ -15,16 +15,23 @@ class InvoicesScreen extends StatefulWidget {
 
 class _InvoicesScreenState extends State<InvoicesScreen> {
   final _searchC = TextEditingController();
+  String _statusFilter = 'all';
   List<Invoice> _all = [];
-  List<Invoice> _filtered = [];
+  bool _loading = true;
+
+  static const _filters = <(String, String)>[
+    ('all',   'Все'),
+    ('sent',  'Не оплачено'),
+    ('paid',  'Оплачено'),
+    ('draft', 'Черновик'),
+  ];
 
   @override
   void initState() {
     super.initState();
     _load();
-    // Перезагружаемся при любом изменении накладных (смена статуса, удаление,
-    // создание из другого экрана) — иначе из-за IndexedStack список устаревает.
     AppDatabase.instance.dataRevision.addListener(_load);
+    _searchC.addListener(() => setState(() {}));
   }
 
   Future<void> _load() async {
@@ -32,19 +39,47 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
     if (!mounted) return;
     setState(() {
       _all = invoices;
-      _filtered = _applyFilter(_all);
+      _loading = false;
     });
   }
 
-  List<Invoice> _applyFilter(List<Invoice> source) {
-    final q = _searchC.text.toLowerCase();
-    if (q.isEmpty) return source;
-    return source.where((inv) =>
-        inv.number.toLowerCase().contains(q) ||
-        inv.clientName.toLowerCase().contains(q)).toList();
+  List<Invoice> get _filtered {
+    var list = _all;
+    switch (_statusFilter) {
+      case 'sent':  list = list.where((i) => i.status == InvoiceStatus.sent).toList();
+      case 'paid':  list = list.where((i) => i.status == InvoiceStatus.paid).toList();
+      case 'draft': list = list.where((i) => i.status == InvoiceStatus.draft).toList();
+    }
+    final q = _searchC.text.trim().toLowerCase();
+    if (q.isNotEmpty) {
+      list = list.where((i) =>
+          i.clientName.toLowerCase().contains(q) ||
+          i.number.toLowerCase().contains(q)).toList();
+    }
+    return list;
   }
 
-  void _filter() => setState(() => _filtered = _applyFilter(_all));
+  double get _monthTotal {
+    final now = DateTime.now();
+    return _all
+        .where((i) => i.date.year == now.year && i.date.month == now.month)
+        .fold(0.0, (s, i) => s + i.total);
+  }
+
+  double get _outstanding =>
+      _all.where((i) => i.status == InvoiceStatus.sent).fold(0.0, (s, i) => s + i.total);
+
+  double get _paidTotal =>
+      _all.where((i) => i.status == InvoiceStatus.paid).fold(0.0, (s, i) => s + i.total);
+
+  int _count(String key) {
+    switch (key) {
+      case 'sent':  return _all.where((i) => i.status == InvoiceStatus.sent).length;
+      case 'paid':  return _all.where((i) => i.status == InvoiceStatus.paid).length;
+      case 'draft': return _all.where((i) => i.status == InvoiceStatus.draft).length;
+      default:      return _all.length;
+    }
+  }
 
   Future<void> _create() async {
     final result = await Navigator.push<bool>(
@@ -64,27 +99,19 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final filtered = _filtered;
+
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Search + create
+        // ── Header ───────────────────────────────────────────────────────────
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          padding: const EdgeInsets.fromLTRB(16, 12, 12, 0),
           child: Row(children: [
-            Expanded(
-              child: TextField(
-                controller: _searchC,
-                decoration: InputDecoration(
-                  hintText: 'Поиск накладных…',
-                  prefixIcon: const Icon(Icons.search, size: 20),
-                  suffixIcon: _searchC.text.isNotEmpty
-                      ? IconButton(icon: const Icon(Icons.clear, size: 18),
-                          onPressed: () { _searchC.clear(); _filter(); })
-                      : null,
-                ),
-                onChanged: (_) => _filter(),
-              ),
-            ),
-            const SizedBox(width: 8),
+            const Text('Накладные',
+                style: TextStyle(
+                    fontSize: 22, fontWeight: FontWeight.bold, color: kGraphite)),
+            const Spacer(),
             FilledButton.icon(
               onPressed: _create,
               icon: const Icon(Icons.add, size: 18),
@@ -92,40 +119,83 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
               style: FilledButton.styleFrom(
                 backgroundColor: kBronze,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               ),
             ),
           ]),
         ),
 
-        // List
-        Expanded(
-          child: _filtered.isEmpty
-              ? Center(
-                  child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(Icons.receipt_long, size: 64, color: Colors.grey.shade300),
-                    const SizedBox(height: 12),
-                    Text(
-                      _searchC.text.isNotEmpty ? 'Ничего не найдено' : 'Накладных пока нет',
-                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
-                    ),
-                    if (_searchC.text.isEmpty) ...[
-                      const SizedBox(height: 6),
-                      Text('Нажмите «Создать» чтобы оформить первую накладную',
-                          style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-                          textAlign: TextAlign.center),
-                    ],
-                  ]),
-                )
-              : ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                  itemCount: _filtered.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
-                  itemBuilder: (_, i) => _InvoiceTile(
-                    invoice: _filtered[i],
-                    onTap: () => _open(_filtered[i]),
-                  ),
+        // ── Stats bar ─────────────────────────────────────────────────────────
+        if (_all.isNotEmpty)
+          _StatsBar(
+            monthTotal:  _monthTotal,
+            outstanding: _outstanding,
+            paid:        _paidTotal,
+          ),
+
+        // ── Search ────────────────────────────────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+          child: TextField(
+            controller: _searchC,
+            decoration: InputDecoration(
+              hintText: 'Поиск по клиенту, номеру…',
+              prefixIcon: const Icon(Icons.search, size: 18),
+              suffixIcon: _searchC.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, size: 16),
+                      onPressed: _searchC.clear,
+                    )
+                  : null,
+            ),
+          ),
+        ),
+
+        // ── Filter chips ─────────────────────────────────────────────────────
+        SizedBox(
+          height: 44,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            itemCount: _filters.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 6),
+            itemBuilder: (_, i) {
+              final (key, label) = _filters[i];
+              final cnt = _count(key);
+              final active = _statusFilter == key;
+              final chipLabel = (key != 'all' && cnt > 0) ? '$label  $cnt' : label;
+              return FilterChip(
+                label: Text(chipLabel),
+                selected: active,
+                onSelected: (_) => setState(() => _statusFilter = key),
+                selectedColor: kBronze,
+                labelStyle: TextStyle(
+                  color: active ? Colors.white : null,
+                  fontSize: 12,
                 ),
+                checkmarkColor: Colors.white,
+                showCheckmark: false,
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+              );
+            },
+          ),
+        ),
+
+        // ── Invoice list ──────────────────────────────────────────────────────
+        Expanded(
+          child: _loading
+              ? const Center(child: CircularProgressIndicator())
+              : filtered.isEmpty
+                  ? _EmptyState(hasData: _all.isNotEmpty, onCreate: _create)
+                  : ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                      itemCount: filtered.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      itemBuilder: (_, i) => _InvoiceTile(
+                        invoice: filtered[i],
+                        onTap: () => _open(filtered[i]),
+                      ),
+                    ),
         ),
       ],
     );
@@ -139,10 +209,139 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
   }
 }
 
-// ─── Invoice tile ──────────────────────────────────────────────────────────────────────────
+// ─── Stats bar ────────────────────────────────────────────────────────────────
+
+class _StatsBar extends StatelessWidget {
+  final double monthTotal;
+  final double outstanding;
+  final double paid;
+  const _StatsBar({
+    required this.monthTotal,
+    required this.outstanding,
+    required this.paid,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [kBronze, Color(0xFF7A5C42)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: kBronze.withOpacity(0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(children: [
+        _cell('За месяц', monthTotal),
+        _divider(),
+        _cell('К оплате', outstanding),
+        _divider(),
+        _cell('Оплачено', paid),
+      ]),
+    );
+  }
+
+  Widget _cell(String label, double amount) => Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Text(label,
+                style: const TextStyle(fontSize: 10, color: Colors.white70),
+                textAlign: TextAlign.center),
+            const SizedBox(height: 4),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                formatCompact(amount),
+                style: const TextStyle(
+                    fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+      );
+
+  Widget _divider() => Container(
+        height: 32,
+        width: 1,
+        margin: const EdgeInsets.symmetric(horizontal: 8),
+        color: Colors.white24,
+      );
+}
+
+// ─── Empty state ──────────────────────────────────────────────────────────────
+
+class _EmptyState extends StatelessWidget {
+  final bool hasData;
+  final VoidCallback onCreate;
+  const _EmptyState({required this.hasData, required this.onCreate});
+
+  @override
+  Widget build(BuildContext context) {
+    if (hasData) {
+      return const Center(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Icon(Icons.filter_list_off, size: 48, color: Colors.grey),
+          SizedBox(height: 8),
+          Text('Ничего не найдено',
+              style: TextStyle(color: Colors.grey, fontSize: 14)),
+        ]),
+      );
+    }
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+            width: 80,
+            height: 80,
+            decoration: const BoxDecoration(
+              color: kGoldLight,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.receipt_long_outlined, size: 40, color: kBronze),
+          ),
+          const SizedBox(height: 20),
+          const Text('Накладных пока нет',
+              style: TextStyle(
+                  fontWeight: FontWeight.w600, fontSize: 17, color: kGraphite)),
+          const SizedBox(height: 8),
+          Text(
+            'Создайте первую накладную — она сохранится здесь и будет доступна для печати',
+            style: TextStyle(color: Colors.grey.shade600, fontSize: 13, height: 1.5),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+          FilledButton.icon(
+            onPressed: onCreate,
+            icon: const Icon(Icons.add),
+            label: const Text('Создать накладную'),
+            style: FilledButton.styleFrom(
+              backgroundColor: kBronze,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+// ─── Invoice tile ─────────────────────────────────────────────────────────────
 
 const _statusColors = {
-  InvoiceStatus.draft: Colors.grey,
+  InvoiceStatus.draft: Color(0xFFAFA395),
   InvoiceStatus.sent:  Color(0xFFF59E0B),
   InvoiceStatus.paid:  Color(0xFF22C55E),
 };
@@ -154,7 +353,7 @@ class _InvoiceTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final borderColor = _statusColors[invoice.status] ?? Colors.grey;
+    final accentColor = _statusColors[invoice.status] ?? const Color(0xFFAFA395);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
@@ -163,13 +362,15 @@ class _InvoiceTile extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           child: IntrinsicHeight(
             child: Row(children: [
-              Container(width: 4, color: borderColor),
+              Container(width: 4, color: accentColor),
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
                   child: Row(children: [
                     Expanded(
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
                         Row(children: [
                           _StatusBadge(status: invoice.status),
                           const SizedBox(width: 8),
@@ -181,20 +382,27 @@ class _InvoiceTile extends StatelessWidget {
                         ]),
                         const SizedBox(height: 4),
                         Text(invoice.clientName,
-                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 15,
+                                color: kGraphite),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis),
                         const SizedBox(height: 2),
-                        Text('${formatDateShort(invoice.date)} · ${invoice.items.length} поз.',
-                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                        Text(
+                          '${formatDateShort(invoice.date)} · ${invoice.items.length} поз.',
+                          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                        ),
                       ]),
                     ),
-                    const SizedBox(width: 8),
-                    Text(formatCurrency(invoice.total),
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                            color: kBronze)),
+                    const SizedBox(width: 12),
+                    Text(
+                      formatCurrency(invoice.total),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: kBronze),
+                    ),
                   ]),
                 ),
               ),
@@ -212,7 +420,7 @@ class _StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = _statusColors[status] ?? Colors.grey;
+    final color = _statusColors[status] ?? const Color(0xFFAFA395);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
@@ -220,8 +428,10 @@ class _StatusBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: color.withOpacity(0.4)),
       ),
-      child: Text(status.label,
-          style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w600)),
+      child: Text(
+        status.label,
+        style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w600),
+      ),
     );
   }
 }

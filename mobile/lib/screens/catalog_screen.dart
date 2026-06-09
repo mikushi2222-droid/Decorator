@@ -65,10 +65,20 @@ class _CatalogScreenState extends State<CatalogScreen> {
   Widget build(BuildContext context) {
     return Column(
       children: [
+        // Header
+        const Padding(
+          padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text('Каталог товаров',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: kGraphite)),
+          ),
+        ),
+
         // Search bar
         Container(
           color: Theme.of(context).colorScheme.surface,
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
           child: TextField(
             controller: _searchC,
             decoration: InputDecoration(
