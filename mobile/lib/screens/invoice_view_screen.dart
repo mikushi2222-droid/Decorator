@@ -30,6 +30,20 @@ class _InvoiceViewScreenState extends State<InvoiceViewScreen> {
     if (mounted) setState(() => _invoice = _invoice.copyWith(status: status));
   }
 
+  Future<void> _duplicate() async {
+    await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => InvoiceFormScreen(templateInvoice: _invoice),
+      ),
+    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Накладная скопирована как черновик')),
+      );
+    }
+  }
+
   Future<void> _edit() async {
     final changed = await Navigator.push<bool>(
       context,
@@ -106,10 +120,29 @@ class _InvoiceViewScreenState extends State<InvoiceViewScreen> {
             icon: const Icon(Icons.edit_outlined),
             tooltip: 'Редактировать',
           ),
-          IconButton(
-            onPressed: _delete,
-            icon: const Icon(Icons.delete_outline),
-            tooltip: 'Удалить',
+          PopupMenuButton<String>(
+            onSelected: (v) {
+              if (v == 'duplicate') _duplicate();
+              if (v == 'delete') _delete();
+            },
+            itemBuilder: (_) => [
+              const PopupMenuItem(
+                value: 'duplicate',
+                child: Row(children: [
+                  Icon(Icons.copy_outlined, size: 20),
+                  SizedBox(width: 12),
+                  Text('Дублировать'),
+                ]),
+              ),
+              PopupMenuItem(
+                value: 'delete',
+                child: Row(children: [
+                  Icon(Icons.delete_outline, size: 20, color: Colors.red.shade600),
+                  const SizedBox(width: 12),
+                  Text('Удалить', style: TextStyle(color: Colors.red.shade600)),
+                ]),
+              ),
+            ],
           ),
         ],
       ),

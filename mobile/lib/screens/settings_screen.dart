@@ -199,12 +199,14 @@ class _StoreSettingsTabState extends State<_StoreSettingsTab> {
             style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: kBronze)),
         const SizedBox(height: 10),
         for (final f in _fields) ...[
-          TextFormField(
-            controller: _controllers[f.$1],
-            maxLines: f.$3 ? 2 : 1,
-            decoration: InputDecoration(labelText: f.$2),
-          ),
-          const SizedBox(height: 10),
+          if (_fieldVisible(f.$1)) ...[
+            TextFormField(
+              controller: _controllers[f.$1],
+              maxLines: f.$3 ? 2 : 1,
+              decoration: InputDecoration(labelText: f.$2),
+            ),
+            const SizedBox(height: 10),
+          ],
         ],
         const SizedBox(height: 6),
         ElevatedButton.icon(
@@ -215,6 +217,19 @@ class _StoreSettingsTabState extends State<_StoreSettingsTab> {
         const SizedBox(height: 24),
       ]),
     );
+  }
+
+  bool _fieldVisible(String key) {
+    switch (key) {
+      case 'kpp':
+        return _businessType == 'ooo';
+      case 'ogrn':
+        return _businessType == 'ooo' || _businessType == 'ip';
+      case 'inn':
+        return _businessType != 'fizlico';
+      default:
+        return true;
+    }
   }
 
   @override

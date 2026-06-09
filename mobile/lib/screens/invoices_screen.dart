@@ -47,6 +47,13 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
   }
 
   void _swipeDelete(Invoice inv) {
+    // Commit any existing pending delete immediately before starting a new one
+    final prev = _pendingDelete;
+    if (prev != null && prev.id != null && prev.id != inv.id) {
+      _pendingDelete = null;
+      AppDatabase.instance.deleteInvoice(prev.id!);
+    }
+
     setState(() {
       _all.removeWhere((i) => i.id == inv.id);
       _pendingDelete = inv;
@@ -58,7 +65,10 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
         action: SnackBarAction(label: 'Отменить', onPressed: _undoDelete),
         duration: const Duration(seconds: 4),
       )).closed.then((reason) {
-        if (reason != SnackBarClosedReason.action) _commitDelete();
+        // Guard with inv.id: undo clears _pendingDelete; another swipe replaces it
+        if (reason != SnackBarClosedReason.action && _pendingDelete?.id == inv.id) {
+          _commitDelete();
+        }
       });
   }
 

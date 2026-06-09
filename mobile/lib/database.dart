@@ -532,7 +532,7 @@ class AppDatabase {
 
   Future<List<Client>> getAllClients() async {
     final db = await database;
-    final rows = await db.query('clients', orderBy: 'name');
+    final rows = await db.query('clients', orderBy: 'updated_at DESC, name');
     return rows.map(Client.fromMap).toList();
   }
 

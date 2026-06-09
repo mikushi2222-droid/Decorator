@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../main.dart';
 import '../database.dart';
@@ -19,6 +20,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
   List<Product> _products = [];
   int _total = 0;
   bool _loading = true;
+  Timer? _debounce;
 
   @override
   void initState() {
@@ -92,7 +94,10 @@ class _CatalogScreenState extends State<CatalogScreen> {
                     )
                   : null,
             ),
-            onChanged: (_) => _search(),
+            onChanged: (_) {
+              _debounce?.cancel();
+              _debounce = Timer(const Duration(milliseconds: 300), _search);
+            },
           ),
         ),
 
@@ -157,16 +162,19 @@ class _CatalogScreenState extends State<CatalogScreen> {
                       padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
                       itemCount: _products.length,
                       separatorBuilder: (_, __) => const SizedBox(height: 6),
-                      itemBuilder: (_, i) => _ProductTile(
-                        product: _products[i],
-                        onCreateInvoice: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => InvoiceFormScreen(
-                                fromProduct: _products[i]),
+                      itemBuilder: (_, i) {
+                        final product = _products[i];
+                        return _ProductTile(
+                          product: product,
+                          onCreateInvoice: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  InvoiceFormScreen(fromProduct: product),
+                            ),
                           ),
-                        ),
-                      ),
+                        );
+                      },
                     ),
         ),
       ],
@@ -175,6 +183,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
     AppDatabase.instance.dataRevision.removeListener(_onDataChanged);
     _searchC.dispose();
     super.dispose();

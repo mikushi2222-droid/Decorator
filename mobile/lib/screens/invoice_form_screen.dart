@@ -5,11 +5,13 @@ import '../models.dart';
 import '../utils.dart';
 
 class InvoiceFormScreen extends StatefulWidget {
-  final Invoice? existingInvoice; // null = новая, non-null = редактирование
-  final Product? fromProduct;     // быстрое создание из каталога
+  final Invoice? existingInvoice;   // null = новая, non-null = редактирование
+  final Invoice? templateInvoice;   // дублирование: копирует клиента и позиции
+  final Product? fromProduct;       // быстрое создание из каталога
   const InvoiceFormScreen({
     super.key,
     this.existingInvoice,
+    this.templateInvoice,
     this.fromProduct,
   });
 
@@ -54,6 +56,21 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
       if (inv.discount > 0) _discountC.text = _fmtQty(inv.discount);
       _notesC.text = inv.notes;
       _items = inv.items.map((item) => _ItemEntry(
+        productId: item.productId,
+        nameC:  TextEditingController(text: item.productName),
+        unitC:  TextEditingController(text: item.unit),
+        qtyC:   TextEditingController(text: _fmtQty(item.quantity)),
+        priceC: TextEditingController(text: item.price.toStringAsFixed(2)),
+      )).toList();
+      if (_items.isEmpty) _items = [_ItemEntry()];
+    } else if (widget.templateInvoice != null) {
+      final tmpl = widget.templateInvoice!;
+      _clientNameC.text    = tmpl.clientName;
+      _clientPhoneC.text   = tmpl.clientPhone;
+      _clientAddressC.text = tmpl.clientAddress;
+      if (tmpl.discount > 0) _discountC.text = _fmtQty(tmpl.discount);
+      _notesC.text = tmpl.notes;
+      _items = tmpl.items.map((item) => _ItemEntry(
         productId: item.productId,
         nameC:  TextEditingController(text: item.productName),
         unitC:  TextEditingController(text: item.unit),
@@ -112,8 +129,10 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
   }
 
   void _loadRecentClients() async {
+    final token = Object();
+    _clientSearchToken = token;
     final res = await AppDatabase.instance.getAllClients();
-    if (!mounted) return;
+    if (!mounted || _clientSearchToken != token) return;
     setState(() => _clientSuggestions = res.take(5).toList());
   }
 
@@ -474,7 +493,7 @@ class _ItemEntry {
     TextEditingController? qtyC,
     TextEditingController? priceC,
   })  : nameC  = nameC  ?? TextEditingController(),
-        unitC  = unitC  ?? TextEditingController(text: 'кг'),
+        unitC  = unitC  ?? TextEditingController(text: 'шт.'),
         qtyC   = qtyC   ?? TextEditingController(text: '1'),
         priceC = priceC ?? TextEditingController(text: '0');
 
