@@ -4,26 +4,10 @@ import '../main.dart';
 import '../models.dart';
 import '../utils.dart';
 
-// Предзаполнение позиций из калькулятора
-class InvoicePresetItem {
-  final String name;
-  final String unit;
-  final double quantity;
-  final double price;
-  const InvoicePresetItem({
-    required this.name,
-    required this.unit,
-    required this.quantity,
-    required this.price,
-  });
-}
-
 class InvoiceFormScreen extends StatefulWidget {
-  final List<InvoicePresetItem> presetItems;
   final Invoice? existingInvoice; // null = новая, non-null = редактирование
   const InvoiceFormScreen({
     super.key,
-    this.presetItems = const [],
     this.existingInvoice,
   });
 
@@ -73,13 +57,6 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
         priceC: TextEditingController(text: item.price.toStringAsFixed(2)),
       )).toList();
       if (_items.isEmpty) _items = [_ItemEntry()];
-    } else if (widget.presetItems.isNotEmpty) {
-      _items = widget.presetItems.map((p) => _ItemEntry(
-        nameC:  TextEditingController(text: p.name),
-        unitC:  TextEditingController(text: p.unit),
-        qtyC:   TextEditingController(text: _fmtQty(p.quantity)),
-        priceC: TextEditingController(text: p.price.toStringAsFixed(2)),
-      )).toList();
     } else {
       _items = [_ItemEntry()];
     }
@@ -415,7 +392,20 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
         child: Padding(
           padding: const EdgeInsets.all(14),
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            Row(children: [
+              Container(
+                width: 3,
+                height: 16,
+                decoration: BoxDecoration(
+                  color: kBronze,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(title,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 14, color: kGraphite)),
+            ]),
             const SizedBox(height: 12),
             ...children,
           ]),
@@ -538,7 +528,7 @@ class _ItemRow extends StatelessWidget {
         Align(
           alignment: Alignment.centerRight,
           child: Text(
-            'Сумма: ${(qty * price).toStringAsFixed(2)} ₽',
+            'Сумма: ${formatCurrency(qty * price)}',
             style: const TextStyle(fontWeight: FontWeight.w600, color: kBronze, fontSize: 13),
           ),
         ),

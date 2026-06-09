@@ -163,7 +163,7 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
               final (key, label) = _filters[i];
               final cnt = _count(key);
               final active = _statusFilter == key;
-              final chipLabel = (key != 'all' && cnt > 0) ? '$label  $cnt' : label;
+              final chipLabel = (key != 'all' && cnt > 0) ? '$label · $cnt' : label;
               return FilterChip(
                 label: Text(chipLabel),
                 selected: active,

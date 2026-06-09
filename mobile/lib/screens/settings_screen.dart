@@ -176,7 +176,7 @@ class _StoreSettingsTabState extends State<_StoreSettingsTab> {
           textCapitalization: TextCapitalization.words,
           decoration: const InputDecoration(
             labelText: 'Ваше имя',
-            hintText: 'Как к вам обращаться на главном экране',
+            hintText: 'Имя в шапке PDF-накладных',
             prefixIcon: Icon(Icons.person_outline, size: 20),
           ),
         ),
