@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../database.dart';
 import '../main.dart';
@@ -34,6 +35,7 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
   final _productSearchC = TextEditingController();
   List<Product> _productSuggestions = [];
   Object? _productSearchToken;
+  Timer? _productDebounce;
 
   // Автодополнение клиентов
   final _clientNameFocus = FocusNode();
@@ -41,6 +43,7 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
   Object? _clientSearchToken;
 
   bool get _isEdit => widget.existingInvoice != null;
+  bool get _isTemplate => widget.templateInvoice != null;
 
   @override
   void initState() {
@@ -97,13 +100,16 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
 
   // ── Поиск товаров ──────────────────────────────────────────────────────────
 
-  void _searchProducts(String q) async {
+  void _searchProducts(String q) {
+    _productDebounce?.cancel();
     if (q.isEmpty) { setState(() => _productSuggestions = []); return; }
-    final token = Object();
-    _productSearchToken = token;
-    final res = await AppDatabase.instance.searchProducts(q);
-    if (!mounted || _productSearchToken != token) return;
-    setState(() => _productSuggestions = res.take(30).toList());
+    _productDebounce = Timer(const Duration(milliseconds: 300), () async {
+      final token = Object();
+      _productSearchToken = token;
+      final res = await AppDatabase.instance.searchProducts(q);
+      if (!mounted || _productSearchToken != token) return;
+      setState(() => _productSuggestions = res.take(30).toList());
+    });
   }
 
   void _addProductFromCatalog(Product p) {
@@ -254,7 +260,7 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isEdit ? 'Редактировать накладную' : 'Новая накладная'),
+        title: Text(_isEdit ? 'Редактировать накладную' : _isTemplate ? 'Копия накладной' : 'Новая накладная'),
         actions: [
           TextButton(
             onPressed: _saving ? null : _save,
@@ -468,6 +474,7 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
 
   @override
   void dispose() {
+    _productDebounce?.cancel();
     _clientNameFocus.removeListener(_onClientFocus);
     _clientNameFocus.dispose();
     _clientNameC.dispose(); _clientPhoneC.dispose(); _clientAddressC.dispose();

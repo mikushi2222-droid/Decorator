@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -251,6 +252,7 @@ class _ProductsTab extends StatefulWidget {
 
 class _ProductsTabState extends State<_ProductsTab> {
   final _searchC = TextEditingController();
+  Timer? _debounce;
   List<Product> _products = [];
   List<String> _categories = ['Все'];
   String _activeCategory = 'Все';
@@ -331,9 +333,9 @@ class _ProductsTabState extends State<_ProductsTab> {
                   id:          existing?.id,
                   name:        nameC.text.trim(),
                   unit:        unitC.text.trim(),
-                  price:       double.tryParse(priceC.text) ?? 0,
-                  coverage:    double.tryParse(coverageC.text) ?? 0,
-                  packSize:    double.tryParse(packSizeC.text) ?? 0,
+                  price:       parseNum(priceC.text) ?? 0,
+                  coverage:    parseNum(coverageC.text) ?? 0,
+                  packSize:    parseNum(packSizeC.text) ?? 0,
                   category:    catC.text.trim(),
                   description: descC.text.trim(),
                 );
@@ -458,7 +460,10 @@ class _ProductsTabState extends State<_ProductsTab> {
                           onPressed: () { _searchC.clear(); _search(); })
                       : null,
                 ),
-                onChanged: (_) => _search(),
+                onChanged: (_) {
+                  _debounce?.cancel();
+                  _debounce = Timer(const Duration(milliseconds: 300), _search);
+                },
               ),
             ),
             const SizedBox(width: 8),
@@ -571,6 +576,7 @@ class _ProductsTabState extends State<_ProductsTab> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _searchC.dispose();
     super.dispose();
   }
@@ -684,7 +690,7 @@ class _LaborTabState extends State<_LaborTab> {
                               style: const TextStyle(fontSize: 12)),
                           if (r.hasMarketData)
                             Text(
-                              'Рынок: от ${formatCurrency(r.marketMin)} · медиана ${formatCurrency(r.marketMedian)} · макс ${formatCurrency(r.marketMax)}',
+                              'Рынок: ${formatCurrency(r.marketMin)}–${formatCurrency(r.marketMedian)}–${formatCurrency(r.marketMax)} / ${r.unit}',
                               style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
                             ),
                         ],

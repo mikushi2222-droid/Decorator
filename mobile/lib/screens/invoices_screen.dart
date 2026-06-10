@@ -152,8 +152,8 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 12, 0),
           child: Row(children: [
-            const Text('Накладные',
-                style: TextStyle(
+            Text(_all.isEmpty ? 'Накладные' : 'Накладные (${_all.length})',
+                style: const TextStyle(
                     fontSize: 22, fontWeight: FontWeight.bold, color: kGraphite)),
             const Spacer(),
             FilledButton.icon(

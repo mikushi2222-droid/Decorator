@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../database.dart';
 import '../main.dart';
 import '../models.dart';
@@ -31,13 +32,13 @@ class _InvoiceViewScreenState extends State<InvoiceViewScreen> {
   }
 
   Future<void> _duplicate() async {
-    await Navigator.push<bool>(
+    final saved = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
         builder: (_) => InvoiceFormScreen(templateInvoice: _invoice),
       ),
     );
-    if (mounted) {
+    if (saved == true && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Накладная скопирована как черновик')),
       );
@@ -177,9 +178,17 @@ class _InvoiceViewScreenState extends State<InvoiceViewScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(_invoice.number,
-                          style: const TextStyle(
-                              fontSize: 20, fontWeight: FontWeight.bold, color: kBronze)),
+                      GestureDetector(
+                        onLongPress: () {
+                          Clipboard.setData(ClipboardData(text: _invoice.number));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Номер скопирован'), duration: Duration(seconds: 2)),
+                          );
+                        },
+                        child: Text(_invoice.number,
+                            style: const TextStyle(
+                                fontSize: 20, fontWeight: FontWeight.bold, color: kBronze)),
+                      ),
                       const SizedBox(height: 2),
                       Text(formatDate(_invoice.date),
                           style: const TextStyle(color: Color(0xFFB0A090), fontSize: 13)),
@@ -308,17 +317,6 @@ class _InvoiceViewScreenState extends State<InvoiceViewScreen> {
                   Expanded(child: _statusBtn('Оплачена', InvoiceStatus.paid, const Color(0xFF22C55E))),
                 ]),
               ]),
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          ElevatedButton.icon(
-            onPressed: _exporting ? null : _exportPDF,
-            icon: const Icon(Icons.picture_as_pdf),
-            label: const Text('Скачать PDF накладную'),
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              textStyle: const TextStyle(fontSize: 16),
             ),
           ),
           const SizedBox(height: 24),
